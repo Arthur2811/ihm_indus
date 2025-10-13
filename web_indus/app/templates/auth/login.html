@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IHM Industrielle Arthur - Connexion</title>
+    <link rel="stylesheet" href="/static/css/auth/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>IHM Industrielle</h1>
+            <p>Système de supervision industrielle</p>
+        </div>
+        
+        <div class="login-form">
+            <div id="alerts"></div>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Nom d'utilisateur</label>
+                    <input type="text" id="username" name="username" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="login-btn" id="loginBtn">
+                    Se connecter
+                </button>
+            </form>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Authentification en cours...</p>
+            </div>
+            
+            <!-- Informations de connexion pour le développement -->
+            <div class="admin-info">
+                <h4>Comptes de test disponibles :</h4>
+                <div><strong>Admin BDD:</strong> <span class="credentials">admin / admin123</span></div>
+                <div><strong>Admin système:</strong> <span class="credentials">root / Industrial123!</span></div>
+                <p><em>L'admin système fonctionne même si la base de données est inaccessible.</em></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
+            const loginBtn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loading');
+            const alertsDiv = document.getElementById('alerts');
+            
+            // Fonction pour afficher les alertes
+            function showAlert(message, type = 'error') {
+                alertsDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+                setTimeout(() => {
+                    alertsDiv.innerHTML = '';
+                }, 5000);
+            }
+            
+            // Gestion du formulaire
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                if (!username || !password) {
+                    showAlert('Veuillez remplir tous les champs');
+                    return;
+                }
+                
+                // UI de chargement
+                loginBtn.disabled = true;
+                loginBtn.textContent = 'Connexion...';
+                loading.style.display = 'block';
+                alertsDiv.innerHTML = '';
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            username: username,
+                            password: password
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showAlert(`Bienvenue ${data.user.nom_complet} !`, 'info');
+                        setTimeout(() => {
+                            window.location.href = data.redirect || '/dashboard';
+                        }, 1000);
+                    } else {
+                        showAlert(data.error || 'Erreur de connexion');
+                    }
+                    
+                } catch (error) {
+                    console.error('Erreur de connexion:', error);
+                    showAlert('Erreur de communication avec le serveur');
+                } finally {
+                    // Réinitialiser l'UI
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Se connecter';
+                    loading.style.display = 'none';
+                }
+            });
+            
+            // Gestion de l'appui sur Entrée
+            document.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !loginBtn.disabled) {
+                    loginForm.dispatchEvent(new Event('submit'));
+                }
+            });
+            
+            // Vérification automatique du statut si on arrive sur la page
+            fetch('/api/auth/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        window.location.href = '/dashboard';
+                    }
+                })
+                .catch(error => {
+                    console.log('Pas de session active');
+                });
+        });
+    </script>
+</body>
+</html>

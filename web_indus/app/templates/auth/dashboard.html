@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de Bord - IHM Industrielle</title>
+    <link rel="stylesheet" href="/static/css/auth/dashboard.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">IHM Industrielle Arthur</div>
+            <div class="user-info">
+                <div class="user-badge role-{{ user.role.lower() }}">
+                    {{ user.nom_complet }} ({{ user.role }})
+                </div>
+                <a href="/logout" class="logout-btn">Déconnexion</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="welcome-card">
+            <h1>Bienvenue, {{ user.nom_complet }}</h1>
+            <p>Vous êtes connecté en tant que <strong>{{ user.role }}</strong></p>
+            {% if user.is_hardcoded %}
+            <p style="color: #e74c3c; margin-top: 1rem;">
+                <strong>Mode administrateur système</strong> - Vous utilisez le compte en dur.
+            </p>
+            {% endif %}
+        </div>
+
+        {% if stats %}
+        <div class="stats-grid">
+            {% if stats.total_tags is defined %}
+            <div class="stat-card">
+                <h3>Tags Totaux</h3>
+                <div class="stat-value">{{ stats.total_tags }}</div>
+            </div>
+            {% endif %}
+            
+            {% if stats.tags_actifs is defined %}
+            <div class="stat-card">
+                <h3>Tags Actifs</h3>
+                <div class="stat-value">{{ stats.tags_actifs }}</div>
+            </div>
+            {% endif %}
+            
+            {% if stats.total_users is defined %}
+            <div class="stat-card">
+                <h3>Utilisateurs</h3>
+                <div class="stat-value">{{ stats.total_users }}</div>
+            </div>
+            {% endif %}
+            
+            {% if stats.active_users is defined %}
+            <div class="stat-card">
+                <h3>Utilisateurs Actifs</h3>
+                <div class="stat-value">{{ stats.active_users }}</div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="nav-grid">
+            <!-- Navigation selon les droits utilisateur -->
+            
+            <a href="/automate" class="nav-card">
+                <h3>Connexion Automate</h3>
+                <p>Configurer la connexion à l'automate Siemens S7</p>
+            </a>
+            
+            {% if user.role_level >= 1 %}
+            <a href="/supervision" class="nav-card">
+                <h3>Supervision</h3>
+                <p>Consulter les valeurs temps réel des tags</p>
+            </a>
+            
+            <a href="/graphics/runtime" class="nav-card">
+                <h3>Runtime Graphique</h3>
+                <p>Interface graphique de supervision</p>
+            </a>
+            {% endif %}
+            
+            {% if user.role_level >= 2 %}
+            <a href="/tags" class="nav-card">
+                <h3>Gestion Tags</h3>
+                <p>Configuration et gestion des tags automate</p>
+            </a>
+            
+            <a href="/graphics/designer" class="nav-card">
+                <h3>Éditeur Graphique</h3>
+                <p>Créer et modifier les interfaces graphiques</p>
+            </a>
+            {% endif %}
+            
+            {% if user.role_level >= 3 %}
+            <a href="/admin/users" class="nav-card">
+                <h3>Gestion Utilisateurs</h3>
+                <p>Administrer les comptes utilisateurs et rôles</p>
+            </a>
+            {% endif %}
+            
+            <a href="/profil" class="nav-card">
+                <h3>Mon Profil</h3>
+                <p>Consulter et modifier vos informations</p>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Rafraîchissement automatique de la session
+        setInterval(function() {
+            fetch('/api/auth/refresh', { method: 'POST' })
+                .catch(error => console.log('Erreur rafraîchissement session'));
+        }, 300000); // Toutes les 5 minutes
+    </script>
+</body>
+</html>

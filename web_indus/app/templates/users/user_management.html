@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👥 Gestion Utilisateurs - IHM Arthur</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitoring/tags.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/users/user_management.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête -->
+        <div class="header">
+            <h1>👥 Gestion des Utilisateurs</h1>
+            <p>Administration des comptes et rôles utilisateur - IHM Industrielle </p>
+            
+            <!-- Navigation -->
+            <div class="navigation">
+                <a href="{{ url_for('main.index') }}" class="nav-btn">🖧 Connexion</a>
+                <a href="{{ url_for('main.tags') }}" class="nav-btn">🏷️ Tags</a>
+                <a href="{{ url_for('main.supervision') }}" class="nav-btn">🔖 Tags Espion</a>
+                <a href="{{ url_for('main.graphics_designer') }}" class="nav-btn">🎨 Éditeur</a>
+                <a href="{{ url_for('main.user_management') }}" class="nav-btn active">👥 Utilisateurs</a>
+                <a href="{{ url_for('main.projects_management') }}" class="nav-btn">📁 Projet</a>
+                <a href="{{ url_for('main.dashboard') }}" class="nav-btn">📊 Dashbord</a>
+                <form action="{{ url_for('main.disconnect_automate') }}" method="POST" style="display:inline;">
+                    <button type="submit" class="nav-btn">🔌 Déconnexion</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Messages flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Use Cases Overview -->
+        <div class="card">
+            <h2>📋 Use Cases Disponibles</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">
+                <div class="use-case-header" style="background: linear-gradient(135deg, #28a745, #20c997);">
+                    <span class="use-case-badge">USER1</span>
+                    <div>
+                        <h3>Ajouter Utilisateur</h3>
+                        <p style="margin: 5px 0 0 0; font-size: 0.9em; opacity: 0.9;">Création de nouveaux comptes utilisateur</p>
+                    </div>
+                </div>
+                <div class="use-case-header" style="background: linear-gradient(135deg, #dc3545, #c82333);">
+                    <span class="use-case-badge">USER2</span>
+                    <div>
+                        <h3>Supprimer Utilisateur</h3>
+                        <p style="margin: 5px 0 0 0; font-size: 0.9em; opacity: 0.9;">Suppression de comptes existants</p>
+                    </div>
+                </div>
+                <div class="use-case-header" style="background: linear-gradient(135deg, #007bff, #0056b3);">
+                    <span class="use-case-badge">USER3</span>
+                    <div>
+                        <h3>Attribuer Rôles</h3>
+                        <p style="margin: 5px 0 0 0; font-size: 0.9em; opacity: 0.9;">Attribution et modification des rôles</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistiques -->
+        <div class="card">
+            <h2>📊 Statistiques Utilisateurs</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">{{ stats.total_users or 0 }}</div>
+                    <div class="stat-label">Total Utilisateurs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ stats.active_users or 0 }}</div>
+                    <div class="stat-label">Actifs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ stats.inactive_users or 0 }}</div>
+                    <div class="stat-label">Inactifs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ roles|length if roles else 0 }}</div>
+                    <div class="stat-label">Rôles Définis</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gestion des utilisateurs -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>👥 Liste des Utilisateurs ({{ users|length if users else 0 }})</h2>
+                <button onclick="openCreateUserModal()" class="btn-use-case btn-user1">
+                    ➕ Ajouter Utilisateur
+                </button>
+            </div>
+
+            {% if users %}
+                <!-- Liste des utilisateurs -->
+                <div id="users-list">
+                    {% for user in users %}
+                    <div class="user-card {{ user.role_nom.lower() }}-user" id="user-{{ user.id_utilisateur }}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px;">
+                                    <h3 style="margin: 0; color: #2a5298;">
+                                        {{ user.prenom_utilisateur }} {{ user.nom_utilisateur }}
+                                    </h3>
+                                    <span class="role-badge role-{{ user.role_nom.lower() }}">
+                                        {{ user.role_nom }}
+                                    </span>
+                                    <span class="user-status {{ 'active' if user.actif else 'inactive' }}">
+                                        {{ 'Actif' if user.actif else 'Inactif' }}
+                                    </span>
+                                </div>
+                                
+                                <div style="color: #666; font-size: 0.9em;">
+                                    <strong>@{{ user.identifiant_utilisateur }}</strong>
+                                    {% if user.email_utilisateur %}
+                                    • 📧 {{ user.email_utilisateur }}
+                                    {% endif %}
+                                    {% if user.telephone_utilisateur %}
+                                    • 📞 {{ user.telephone_utilisateur }}
+                                    {% endif %}
+                                </div>
+                                
+                                <div style="color: #999; font-size: 0.8em; margin-top: 5px;">
+                                    Créé le {{ user.date_creation_utilisateur.strftime('%d/%m/%Y à %H:%M') if user.date_creation_utilisateur }}
+                                    {% if user.derniere_connexion %}
+                                    • Dernière connexion: {{ user.derniere_connexion.strftime('%d/%m/%Y à %H:%M') }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+                                <!-- USE CASE USER3: Attribuer rôles -->
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="openRoleModal({{ user.id_utilisateur }}, '{{ user.identifiant_utilisateur }}', {{ user.id_role }})" 
+                                            class="btn-use-case btn-user3" title="USE CASE USER3: Changer le rôle">
+                                        🔄 Rôle
+                                    </button>
+                                    <button onclick="editUser({{ user.id_utilisateur }})" 
+                                            class="btn-icon btn-edit" title="Modifier les informations">
+                                        ✏️
+                                    </button>
+                                </div>
+                                
+                                <!-- USE CASE USER2: Supprimer utilisateur -->
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="toggleUserStatus({{ user.id_utilisateur }})" 
+                                            class="btn-icon btn-toggle" title="Activer/Désactiver">
+                                        {{ '⌛' if user.actif else '✅' }}
+                                    </button>
+                                    <button onclick="deleteUser({{ user.id_utilisateur }}, '{{ user.identifiant_utilisateur }}')" 
+                                            class="btn-use-case btn-user2" title="USE CASE USER2: Supprimer utilisateur">
+                                        🗑️ Supprimer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Aucun utilisateur -->
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <h3>Aucun utilisateur trouvé</h3>
+                    <p>Initialisez le système avec des données par défaut</p>
+                    <button onclick="initData()" class="btn-use-case btn-user1">
+                        🚀 Initialiser Données par Défaut
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Actions en lot -->
+        <div class="card">
+            <h3>⚙️ Actions en Lot</h3>
+            <div class="btn-group" style="margin-top: 10px;">
+                <button onclick="exportUsers()" class="btn btn-info btn-small">
+                    💾 Exporter Utilisateurs
+                </button>
+                <button onclick="showUserStats()" class="btn btn-secondary btn-small">
+                    📈 Statistiques Détaillées
+                </button>
+                <button onclick="systemCheck()" class="btn btn-warning btn-small">
+                    🔍 Vérification Système
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Création/Édition Utilisateur (USE CASE USER1) -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">➕ Nouvel Utilisateur (USE CASE USER1)</h2>
+            
+            <form id="user-form">
+                <input type="hidden" id="user-id" name="user_id">
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="identifiant" class="required">Identifiant</label>
+                        <input type="text" id="identifiant" name="identifiant_utilisateur" required 
+                               placeholder="Ex: jdupont" maxlength="50">
+                        <div id="identifiant-validation" class="validation-message" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mot-de-passe" class="required">Mot de passe</label>
+                        <input type="password" id="mot-de-passe" name="mot_de_passe" required 
+                               placeholder="Minimum 6 caractères" minlength="6">
+                        <div id="password-validation" class="validation-message" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="nom" class="required">Nom</label>
+                        <input type="text" id="nom" name="nom_utilisateur" required 
+                               placeholder="Ex: Dupont" maxlength="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="prenom" class="required">Prénom</label>
+                        <input type="text" id="prenom" name="prenom_utilisateur" required 
+                               placeholder="Ex: Jean" maxlength="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email_utilisateur" 
+                               placeholder="jean.dupont@example.com" maxlength="100">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="telephone">Téléphone</label>
+                        <input type="tel" id="telephone" name="telephone_utilisateur" 
+                               placeholder="0123456789" maxlength="15">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="role" class="required">Rôle (USE CASE USER3)</label>
+                        <select id="role" name="id_role" required>
+                            {% for role in roles %}
+                            <option value="{{ role.id_role }}">
+                                {{ role.nom_role }} (Niveau {{ role.niveau_role }})
+                                {% if role.nom_role == 'ADMIN' %} - Gestion Utilisateurs
+                                {% elif role.nom_role == 'AUTO' %} - Config Technique
+                                {% elif role.nom_role == 'OP' %} - Consultation
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="actif">Statut</label>
+                        <select id="actif" name="actif">
+                            <option value="true">Actif</option>
+                            <option value="false">Inactif</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="text-align: right; margin-top: 25px;">
+                    <button type="button" onclick="closeModal()" class="btn btn-secondary">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn-use-case btn-user1">
+                        💾 Sauvegarder
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Attribution Rôle (USE CASE USER3) -->
+    <div id="roleModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeRoleModal()">&times;</span>
+            <h2>🔄 Attribuer Rôle (USE CASE USER3)</h2>
+            
+            <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <strong>Utilisateur:</strong> <span id="role-user-name"></span>
+            </div>
+            
+            <form id="role-form">
+                <input type="hidden" id="role-user-id" name="user_id">
+                
+                <div class="form-group">
+                    <label for="new-role" class="required">Nouveau Rôle</label>
+                    <select id="new-role" name="role_id" required>
+                        {% for role in roles %}
+                        <option value="{{ role.id_role }}">
+                            {{ role.nom_role }} (Niveau {{ role.niveau_role }})
+                            {% if role.nom_role == 'ADMIN' %} - Gestion Utilisateurs uniquement
+                            {% elif role.nom_role == 'AUTO' %} - Configuration technique complète
+                            {% elif role.nom_role == 'OP' %} - Consultation uniquement
+                            {% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <h4 style="margin: 0 0 10px 0; color: #0056b3;">📋 Rôles selon Use Case:</h4>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li><strong>ADMIN:</strong> Gestion utilisateurs uniquement (USER1, USER2, USER3)</li>
+                        <li><strong>AUTO:</strong> Configuration technique complète (projets, tags, communication)</li>
+                        <li><strong>OP:</strong> Consultation uniquement (mode run, visualisation)</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: right; margin-top: 25px;">
+                    <button type="button" onclick="closeRoleModal()" class="btn btn-secondary">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn-use-case btn-user3">
+                        🔄 Attribuer Rôle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // =================================================================
+        // GESTION UTILISATEURS - USE CASES USER1, USER2, USER3
+        // =================================================================
+        
+        // Variables globales
+        let currentEditingUser = null;
+        let currentRoleUser = null;
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('👥 Gestion Utilisateurs - Prête (Use Cases USER1, USER2, USER3)');
+            setupEventListeners();
+            checkSystemStatus();
+        });
+
+        function setupEventListeners() {
+            // Formulaire utilisateur (USE CASE USER1)
+            document.getElementById('user-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveUser();
+            });
+
+            // Formulaire rôle (USE CASE USER3)
+            document.getElementById('role-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                assignRole();
+            });
+
+            // Validation en temps réel
+            document.getElementById('identifiant').addEventListener('input', validateIdentifiant);
+            document.getElementById('mot-de-passe').addEventListener('input', validatePassword);
+
+            // Fermeture modal par clic extérieur
+            window.addEventListener('click', function(e) {
+                const userModal = document.getElementById('userModal');
+                const roleModal = document.getElementById('roleModal');
+                if (e.target === userModal) {
+                    closeModal();
+                }
+                if (e.target === roleModal) {
+                    closeRoleModal();
+                }
+            });
+        }
+
+        // =================================================================
+        // USE CASE USER1: AJOUTER UTILISATEUR
+        // =================================================================
+
+        function openCreateUserModal() {
+            currentEditingUser = null;
+            document.getElementById('modal-title').textContent = '➕ Nouvel Utilisateur (USE CASE USER1)';
+            document.getElementById('user-form').reset();
+            document.getElementById('user-id').value = '';
+            clearValidationMessages();
+            document.getElementById('userModal').style.display = 'block';
+            
+            console.log('[USER1] Modal création utilisateur ouverte');
+        }
+
+        async function saveUser() {
+            console.log('[USER1] Tentative sauvegarde utilisateur...');
+            
+            if (!validateUserForm()) {
+                NotificationManager.show('Veuillez corriger les erreurs dans le formulaire', 'error');
+                return;
+            }
+
+            const formData = new FormData(document.getElementById('user-form'));
+            const userData = {};
+            
+            // Convertir FormData en objet
+            for (let [key, value] of formData.entries()) {
+                if (key === 'actif') {
+                    userData[key] = value === 'true';
+                } else if (key === 'id_role') {
+                    userData[key] = parseInt(value);
+                } else if (value.trim() !== '') {
+                    userData[key] = value;
+                }
+            }
+
+            try {
+                const isEdit = currentEditingUser !== null;
+                const url = isEdit ? `/api/admin/users/${currentEditingUser}` : '/api/admin/users';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                console.log(`[USER1] ${isEdit ? 'Modification' : 'Création'} utilisateur:`, userData);
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const action = isEdit ? 'modifié' : 'créé';
+                    console.log(`[USER1] ✅ Utilisateur ${action}:`, result.message);
+                    NotificationManager.show(`✅ ${result.message}`, 'success');
+                    closeModal();
+                    location.reload();
+                } else {
+                    console.log(`[USER1] ❌ Erreur:`, result.error);
+                    NotificationManager.show(`❌ ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.log(`[USER1] ❌ Erreur système:`, error);
+                NotificationManager.show(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // =================================================================
+        // USE CASE USER2: SUPPRIMER UTILISATEUR
+        // =================================================================
+
+        async function deleteUser(userId, username) {
+            console.log(`[USER2] Tentative suppression utilisateur: ${username} (ID: ${userId})`);
+            
+            if (!confirm(`⚠️ USE CASE USER2: SUPPRIMER UTILISATEUR\n\nSupprimer l'utilisateur "${username}" ?\n\nCette action est irréversible et supprimera:\n- Le compte utilisateur\n- Toutes ses sessions\n- Tous ses accès\n\nConfirmer la suppression ?`)) {
+                console.log('[USER2] Suppression annulée par l\'utilisateur');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log('[USER2] ✅ Utilisateur supprimé:', result.message);
+                    NotificationManager.show(`✅ ${result.message}`, 'success');
+                    document.getElementById(`user-${userId}`).remove();
+                    updateStats();
+                } else {
+                    console.log('[USER2] ❌ Échec suppression:', result.error);
+                    NotificationManager.show(`❌ ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.log('[USER2] ❌ Erreur système:', error);
+                NotificationManager.show(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // =================================================================
+        // USE CASE USER3: ATTRIBUER RÔLES
+        // =================================================================
+
+        function openRoleModal(userId, username, currentRoleId) {
+            console.log(`[USER3] Ouverture modal attribution rôle pour: ${username} (ID: ${userId})`);
+            
+            currentRoleUser = userId;
+            document.getElementById('role-user-id').value = userId;
+            document.getElementById('role-user-name').textContent = username;
+            document.getElementById('new-role').value = currentRoleId;
+            document.getElementById('roleModal').style.display = 'block';
+        }
+
+        async function assignRole() {
+            const userId = document.getElementById('role-user-id').value;
+            const roleId = document.getElementById('new-role').value;
+            const username = document.getElementById('role-user-name').textContent;
+            
+            console.log(`[USER3] Tentative attribution rôle ${roleId} à ${username} (ID: ${userId})`);
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/role`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ role_id: parseInt(roleId) })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log('[USER3] ✅ Rôle attribué:', result.message);
+                    NotificationManager.show(`✅ ${result.message}`, 'success');
+                    closeRoleModal();
+                    location.reload();
+                } else {
+                    console.log('[USER3] ❌ Échec attribution:', result.error);
+                    NotificationManager.show(`❌ ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.log('[USER3] ❌ Erreur système:', error);
+                NotificationManager.show(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        function closeRoleModal() {
+            document.getElementById('roleModal').style.display = 'none';
+            currentRoleUser = null;
+        }
+
+        // =================================================================
+        // FONCTIONS UTILITAIRES
+        // =================================================================
+
+        function closeModal() {
+            document.getElementById('userModal').style.display = 'none';
+            currentEditingUser = null;
+            clearValidationMessages();
+        }
+
+        async function editUser(userId) {
+            try {
+                console.log(`[USER1] Chargement données utilisateur ${userId} pour édition`);
+                const response = await fetch(`/api/admin/users/${userId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const user = result.user;
+                    currentEditingUser = userId;
+                    
+                    // Remplir le formulaire
+                    document.getElementById('modal-title').textContent = '✏️ Modifier Utilisateur (USE CASE USER1)';
+                    document.getElementById('user-id').value = user.id_utilisateur;
+                    document.getElementById('identifiant').value = user.identifiant_utilisateur;
+                    document.getElementById('nom').value = user.nom_utilisateur;
+                    document.getElementById('prenom').value = user.prenom_utilisateur;
+                    document.getElementById('email').value = user.email_utilisateur || '';
+                    document.getElementById('telephone').value = user.telephone_utilisateur || '';
+                    document.getElementById('role').value = user.id_role;
+                    document.getElementById('actif').value = user.actif ? 'true' : 'false';
+                    
+                    // Mot de passe optionnel pour modification
+                    document.getElementById('mot-de-passe').required = false;
+                    document.getElementById('mot-de-passe').placeholder = 'Laisser vide pour ne pas changer';
+
+                    clearValidationMessages();
+                    document.getElementById('userModal').style.display = 'block';
+                } else {
+                    NotificationManager.show(`❌ ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                NotificationManager.show(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function toggleUserStatus(userId) {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/toggle`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    NotificationManager.show(`✅ ${result.message}`, 'success');
+                    location.reload();
+                } else {
+                    NotificationManager.show(`❌ ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                NotificationManager.show(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // =================================================================
+        // VALIDATION FORMULAIRE
+        // =================================================================
+
+        function validateUserForm() {
+            let isValid = true;
+            
+            // Validation identifiant
+            const identifiant = document.getElementById('identifiant').value;
+            if (!validateIdentifiant()) {
+                isValid = false;
+            }
+            
+            // Validation mot de passe (si requis)
+            const password = document.getElementById('mot-de-passe');
+            if (password.required && !validatePassword()) {
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+
+        function validateIdentifiant() {
+            const input = document.getElementById('identifiant');
+            const value = input.value.trim();
+            const validation = document.getElementById('identifiant-validation');
+            
+            let isValid = true;
+            let message = '';
+            
+            if (value.length < 3) {
+                isValid = false;
+                message = 'L\'identifiant doit faire au moins 3 caractères';
+            } else if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+                isValid = false;
+                message = 'Seuls les lettres, chiffres, _ et - sont autorisés';
+            } else if (value.length > 50) {
+                isValid = false;
+                message = 'L\'identifiant ne peut dépasser 50 caractères';
+            }
+            
+            if (isValid) {
+                input.classList.remove('error');
+                validation.style.display = 'none';
+            } else {
+                input.classList.add('error');
+                validation.textContent = message;
+                validation.className = 'validation-message error';
+                validation.style.display = 'block';
+            }
+            
+            return isValid;
+        }
+
+        function validatePassword() {
+            const input = document.getElementById('mot-de-passe');
+            const value = input.value;
+            const validation = document.getElementById('password-validation');
+            
+            let isValid = true;
+            let message = '';
+            
+            if (input.required && value.length < 6) {
+                isValid = false;
+                message = 'Le mot de passe doit faire au moins 6 caractères';
+            } else if (value.length > 255) {
+                isValid = false;
+                message = 'Le mot de passe ne peut dépasser 255 caractères';
+            }
+            
+            if (isValid) {
+                input.classList.remove('error');
+                validation.style.display = 'none';
+            } else {
+                input.classList.add('error');
+                validation.textContent = message;
+                validation.className = 'validation-message error';
+                validation.style.display = 'block';
+            }
+            
+            return isValid;
+        }
+
+        function clearValidationMessages() {
+            const inputs = document.querySelectorAll('#user-form input');
+            const validations = document.querySelectorAll('.validation-message');
+            
+            inputs.forEach(input => input.classList.remove('error'));
+            validations.forEach(validation => validation.style.display = 'none');
+        }
+
+        // =================================================================
+        // SYSTÈME DE NOTIFICATIONS
+        // =================================================================
+
+        class NotificationManager {
+            static show(message, type = 'info', duration = 4000) {
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.innerHTML = `
+                    <div class="notification-content">
+                        <span class="notification-icon">${this.getIcon(type)}</span>
+                        <span class="notification-message">${message}</span>
+                        <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+                    </div>
+                `;
+                
+                document.body.appendChild(notification);
+                
+                // Animation d'entrée
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                // Suppression automatique
+                if (duration > 0) {
+                    setTimeout(() => {
+                        notification.classList.remove('show');
+                        setTimeout(() => notification.remove(), 300);
+                    }, duration);
+                }
+            }
+            
+            static getIcon(type) {
+                const icons = {
+                    'success': '✅',
+                    'error': '❌',
+                    'warning': '⚠️',
+                    'info': 'ℹ️'
+                };
+                return icons[type] || icons.info;
+            }
+        }
+
+        // =================================================================
+        // INITIALISATION ET UTILITAIRES
+        // =================================================================
+
+        async function initData() {
+            if (!confirm('Initialiser les données par défaut ?\n\nCela créera :\n- Les rôles ADMIN, AUTO, OP\n- Un compte administrateur par défaut\n\nContinuer ?')) {
+                return;
+            }
+
+            try {
+                console.log('[INIT] Initialisation des données par défaut...');
+                const response = await fetch('/api/admin/init_default_data', { 
+                    method: 'POST' 
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('[INIT] ✅ Données initialisées:', data.message);
+                    NotificationManager.show(`✅ ${data.message}`, 'success', 6000);
+                    location.reload();
+                } else {
+                    console.log('[INIT] ❌ Erreur:', data.error);
+                    NotificationManager.show(`❌ ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.log('[INIT] ❌ Erreur système:', error);
+                NotificationManager.show(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkSystemStatus() {
+            try {
+                const response = await fetch('/api/admin/system_check');
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('[SYSTEM] État système:', result.system_checks);
+                    if (result.status !== 'healthy') {
+                        console.warn('[SYSTEM] ⚠️ Système nécessite attention');
+                    }
+                }
+            } catch (error) {
+                console.warn('[SYSTEM] Impossible de vérifier l\'état du système:', error);
+            }
+        }
+
+        async function systemCheck() {
+            try {
+                const response = await fetch('/api/admin/system_check');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const checks = result.system_checks;
+                    let message = '🔍 Vérification Système\n\n';
+                    message += `Base de données: ${checks.database_connection ? '✅' : '❌'}\n`;
+                    message += `Rôles configurés: ${checks.roles_exist ? '✅' : '❌'} (${checks.roles_count})\n`;
+                    message += `Admin existant: ${checks.admin_exists ? '✅' : '❌'}\n`;
+                    message += `Total utilisateurs: ${checks.users_count}\n\n`;
+                    message += `État global: ${result.status === 'healthy' ? '✅ Système opérationnel' : '⚠️ Attention requise'}`;
+                    
+                    alert(message);
+                } else {
+                    NotificationManager.show('❌ Erreur vérification système', 'error');
+                }
+            } catch (error) {
+                NotificationManager.show('❌ Erreur système', 'error');
+            }
+        }
+
+        function exportUsers() {
+            const data = {
+                export_date: new Date().toISOString(),
+                use_cases: ['USER1: Ajouter utilisateur', 'USER2: Supprimer utilisateur', 'USER3: Attribuer rôles'],
+                users: {{ users|tojson if users else '[]' }},
+                roles: {{ roles|tojson if roles else '[]' }},
+                stats: {{ stats|tojson if stats else '{}' }}
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { 
+                type: 'application/json' 
+            });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `users_export_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            NotificationManager.show('💾 Export des utilisateurs terminé', 'success');
+        }
+
+        function showUserStats() {
+            const stats = {{ stats|tojson if stats else '{}' }};
+            const roleStats = stats.role_stats || {};
+            
+            let message = '📈 Statistiques Détaillées - Use Cases IHM 4.0\n\n';
+            message += `Total utilisateurs: ${stats.total_users || 0}\n`;
+            message += `Utilisateurs actifs: ${stats.active_users || 0}\n`;
+            message += `Utilisateurs inactifs: ${stats.inactive_users || 0}\n\n`;
+            message += 'Répartition par rôle (selon Use Case):\n';
+            
+            for (const [role, count] of Object.entries(roleStats)) {
+                let description = '';
+                if (role === 'ADMIN') description = ' (Gestion utilisateurs)';
+                else if (role === 'AUTO') description = ' (Config technique)';
+                else if (role === 'OP') description = ' (Consultation)';
+                
+                message += `• ${role}${description}: ${count}\n`;
+            }
+            
+            message += '\n📋 Use Cases implémentés:\n';
+            message += '• USER1: Ajouter utilisateur ✅\n';
+            message += '• USER2: Supprimer utilisateur ✅\n';
+            message += '• USER3: Attribuer rôles ✅\n';
+            
+            alert(message);
+        }
+
+        function updateStats() {
+            // Recharger les statistiques après modification
+            fetch('/api/admin/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('[STATS] Statistiques mises à jour:', data.stats);
+                    }
+                })
+                .catch(error => {
+                    console.warn('[STATS] Erreur mise à jour stats:', error);
+                });
+        }
+
+        // Log d'initialisation
+        console.log('👥 Système de gestion des utilisateurs prêt !');
+        console.log('📋 Use Cases disponibles:');
+        console.log('   - USER1: Ajouter utilisateur');
+        console.log('   - USER2: Supprimer utilisateur'); 
+        console.log('   - USER3: Attribuer rôles');
+        console.log('🔒 Sécurité: Hashage bcrypt activé');
+        console.log('🎯 Conformité: Use Case IHM Industrielle 4.0');
+    </script>
+</body>
+</html>

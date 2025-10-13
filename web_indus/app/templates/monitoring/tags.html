@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion Tags - IHM Arthur</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitoring/tags.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête -->
+        <div class="header">
+            <h1>🏷️ Gestion des Tags</h1>
+            <p>Configuration et gestion des tags Siemens S7</p>
+            
+            <!-- Navigation -->
+            <div class="navigation">
+            <a href="{{ url_for('main.index') }}" class="nav-btn">🖧 Connexion</a>
+            <a href="{{ url_for('main.tags') }}" class="nav-btn">🏷️ Gestion Tags</a>
+            <a href="{{ url_for('main.supervision') }}" class="nav-btn">🔖 Tags Espion</a>
+            <a href="{{ url_for('main.graphics_designer') }}" class="nav-btn">🎨 Éditeur IHM</a>
+            <a href="{{ url_for('main.user_management') }}" class="nav-btn">👥 Utilisateurs</a>
+            <a href="{{ url_for('main.projects_management') }}" class="nav-btn">📁 Projet</a>
+            <a href="{{ url_for('main.dashboard') }}" class="nav-btn">📊 Dashbord</a>
+            <form action="{{ url_for('main.disconnect_automate') }}" method="POST" style="display:inline;">
+                <button type="submit" class="nav-btn">🔌 Déconnexion</button>
+            </form>
+        </div>
+
+        <!-- Section Gestion Tags -->
+        <div class="card">
+            <h2>🏷️ Gestion des Tags Siemens S7</h2>
+            
+            <!-- Statistiques CORRIGÉES -->
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <div class="stat-number">{{ tags|length if tags else 0 }}</div>
+                    <div class="stat-label">Tags Total</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">
+                        {% if tags %}
+                            {{ tags|selectattr('disponibilite_externe', 'equalto', True)|list|length }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </div>
+                    <div class="stat-label">Actifs</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">
+                        {% if tags %}
+                            {% set count = [] %}
+                            {% for tag in tags %}
+                                {% if tag.acces and 'W' in tag.acces %}
+                                    {% if count.append(1) %}{% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {{ count|length }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </div>
+                    <div class="stat-label">Écriture</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">
+                        {% if tags %}
+                            {{ tags|selectattr('type_donnee', 'equalto', 'BOOL')|list|length }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </div>
+                    <div class="stat-label">BOOL</div>
+                </div>
+            </div>
+
+            <!-- Formulaire de création de tag -->
+            <form id="tag-form" class="tag-form">
+                <div class="form-group">
+                    <label for="tag_nom">🏷️ Nom du Tag:</label>
+                    <input type="text" id="tag_nom" placeholder="ex: bp_marche" required>
+                    <div class="helper-text">Nom unique pour identifier le tag</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tag_db">🗂️ Numéro DB:</label>
+                    <input type="number" id="tag_db" placeholder="1" min="1" max="9999" required>
+                    <div class="helper-text">Numéro du Data Block (DB1, DB2...)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tag_type">📋 Type de Donnée:</label>
+                    <select id="tag_type" onchange="updateOffsetHelper()" required>
+                        <option value="BOOL">BOOL (Bit)</option>
+                        <option value="INT">INT (16-bit)</option>
+                        <option value="DINT">DINT (32-bit)</option>
+                        <option value="REAL">REAL (32-bit Float)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tag_offset">📍 Offset (Adresse):</label>
+                    <input type="text" id="tag_offset" placeholder="0.0" required>
+                    <div class="helper-text" id="offset-helper">
+                        Pour BOOL: byte.bit (ex: 0.0, 1.3)<br>
+                        Pour INT/DINT/REAL: byte (ex: 2, 4, 6)
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tag_acces">🔐 Accès:</label>
+                    <select id="tag_acces">
+                        <option value="R">Lecture seule</option>
+                        <option value="W">Écriture seule</option>
+                        <option value="RW">Lecture/Écriture</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tag_description">📝 Description:</label>
+                    <input type="text" id="tag_description" placeholder="Description du tag">
+                    <div class="helper-text">Description optionnelle du tag</div>
+                </div>
+
+                <div class="form-group">
+                    <label>⚡ Actions:</label>
+                    <div class="btn-group">
+                        <button type="button" onclick="previewAdresse()" class="btn btn-info btn-small">
+                            👁️ APERÇU ADRESSE
+                        </button>
+                        <button type="button" onclick="ajouterTag()" class="btn btn-success">
+                            ➕ AJOUTER TAG
+                        </button>
+                        <button type="button" onclick="chargerTagsDefaut()" class="btn btn-secondary btn-small">
+                            🔄 TAGS DÉFAUT
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Barre de recherche et filtres -->
+            <div class="search-bar">
+                <input type="text" class="search-input" id="search-tags" placeholder="🔍 Rechercher un tag..." onkeyup="filtrerTags()">
+                <select id="filter-type" onchange="filtrerTags()">
+                    <option value="">Tous types</option>
+                    <option value="BOOL">BOOL</option>
+                    <option value="INT">INT</option>
+                    <option value="DINT">DINT</option>
+                    <option value="REAL">REAL</option>
+                </select>
+                <select id="filter-access" onchange="filtrerTags()">
+                    <option value="">Tous accès</option>
+                    <option value="R">Lecture</option>
+                    <option value="W">Écriture</option>
+                    <option value="RW">Lecture/Écriture</option>
+                </select>
+                <button type="button" onclick="clearFilters()" class="btn btn-secondary btn-small">
+                    🗑️ EFFACER FILTRES
+                </button>
+            </div>
+
+            <!-- Liste des tags configurés -->
+            <div style="margin-top: 30px;">
+                <h3>📋 Tags Configurés (<span id="tags-count">{{ tags|length if tags else 0 }}</span>)</h3>
+                
+                <table class="data-table" id="tags-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Adresse S7</th>
+                            <th>Type</th>
+                            <th>Accès</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tags-list">
+                        {% if tags %}
+                            {% for tag in tags %}
+                            <tr>
+                                <td><strong>{{ tag.nom_tag }}</strong></td>
+                                <td><code>{{ tag.adresse_tag }}</code></td>
+                                <td><span class="tag-value">{{ tag.type_donnee }}</span></td>
+                                <td>{{ tag.acces }}</td>
+                                <td>{{ tag.description_tag or '-' }}</td>
+                                <td class="tag-actions">
+                                    <button onclick="lireTag('{{ tag.nom_tag }}')" class="btn btn-primary btn-small" title="Lire">📖</button>
+                                    {% if tag.acces and 'W' in tag.acces %}
+                                    <button onclick="ecrireTag('{{ tag.nom_tag }}')" class="btn btn-success btn-small" title="Écrire">✏️</button>
+                                    {% endif %}
+                                    <!--<button onclick="supprimerTag({{ tag.id_tag }})" class="btn btn-danger btn-small" title="Supprimer">🗑️</button> -->
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #666; padding: 20px;">
+                                    Aucun tag configuré. Créez vos premiers tags ci-dessus.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Actions en lot -->
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <h4>⚙️ Actions en Lot</h4>
+                <div class="btn-group" style="margin-top: 10px;">
+                    <button type="button" onclick="exportTags()" class="btn btn-info btn-small">
+                        💾 EXPORTER TAGS
+                    </button>
+                    <button type="button" onclick="importTags()" class="btn btn-info btn-small">
+                        📂 IMPORTER TAGS
+                    </button>
+                    <button type="button" onclick="validateAllTags()" class="btn btn-secondary btn-small">
+                        ✅ VALIDER TOUS
+                    </button>
+                    <button type="button" onclick="deleteAllTags()" class="btn btn-danger btn-small">
+                        🗑️ SUPPRIMER TOUS
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let allTags = [];
+        let filteredTags = [];
+
+        // Fonctions utilitaires pour l'offset
+        function updateOffsetHelper() {
+            const type = document.getElementById('tag_type').value;
+            const helper = document.getElementById('offset-helper');
+            
+            switch (type) {
+                case 'BOOL':
+                    helper.innerHTML = '📍 Pour BOOL: byte.bit (ex: 0.0, 1.3, 2.7)<br>Le bit doit être entre 0 et 7';
+                    document.getElementById('tag_offset').placeholder = '0.0';
+                    break;
+                case 'INT':
+                    helper.innerHTML = '📍 Pour INT: byte pair (ex: 0, 2, 4, 6...)<br>Taille: 2 bytes (16-bit)';
+                    document.getElementById('tag_offset').placeholder = '2';
+                    break;
+                case 'DINT':
+                    helper.innerHTML = '📍 Pour DINT: byte multiple de 4 (ex: 0, 4, 8, 12...)<br>Taille: 4 bytes (32-bit)';
+                    document.getElementById('tag_offset').placeholder = '4';
+                    break;
+                case 'REAL':
+                    helper.innerHTML = '📍 Pour REAL: byte multiple de 4 (ex: 0, 4, 8, 12...)<br>Taille: 4 bytes (32-bit float)';
+                    document.getElementById('tag_offset').placeholder = '8';
+                    break;
+            }
+        }
+
+        // Prévisualisation de l'adresse
+        async function previewAdresse() {
+            const db = document.getElementById('tag_db').value;
+            const type = document.getElementById('tag_type').value;
+            const offset = document.getElementById('tag_offset').value;
+
+            if (!db || !offset) {
+                alert('Veuillez remplir DB et Offset');
+                return;
+            }
+
+            // Génération locale de l'adresse
+            let adresse;
+            switch (type) {
+                case 'BOOL':
+                    if (!offset.includes('.')) {
+                        alert('Pour BOOL, utilisez le format byte.bit (ex: 0.0)');
+                        return;
+                    }
+                    adresse = `DB${db}.DBX${offset}`;
+                    break;
+                case 'INT':
+                    adresse = `DB${db}.DBW${offset}`;
+                    break;
+                case 'DINT':
+                    adresse = `DB${db}.DBD${offset}`;
+                    break;
+                case 'REAL':
+                    adresse = `DB${db}.DBD${offset}`;
+                    break;
+            }
+            alert(`📍 Adresse générée: ${adresse}`);
+        }
+
+        // Ajouter un tag
+        async function ajouterTag() {
+            const nom = document.getElementById('tag_nom').value;
+            const db = document.getElementById('tag_db').value;
+            const type = document.getElementById('tag_type').value;
+            const offset = document.getElementById('tag_offset').value;
+            const acces = document.getElementById('tag_acces').value;
+            const description = document.getElementById('tag_description').value;
+
+            if (!nom || !db || !offset) {
+                alert('Veuillez remplir tous les champs obligatoires');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/create_tag_flexible', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        nom_tag: nom,
+                        db: parseInt(db),
+                        type_donnee: type,
+                        offset: offset,
+                        acces: acces,
+                        description_tag: description
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.tag) {
+                    alert(`✅ Tag "${nom}" créé avec succès (${data.adresse_generee})`);
+                    
+                    // Réinitialiser le formulaire
+                    document.getElementById('tag-form').reset();
+                    document.getElementById('tag_db').value = '';
+                    document.getElementById('tag_type').value = 'BOOL';
+                    updateOffsetHelper();
+
+                    // Recharger la page pour voir le nouveau tag
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert(`❌ ${data.error || 'Erreur création tag'}`);
+                }
+
+            } catch (error) {
+                alert(`❌ Erreur création tag: ${error.message}`);
+            }
+        }
+
+        // Supprimer un tag
+        async function supprimerTag(id) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce tag ?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/tags/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('Tag supprimé avec succès');
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    const data = await response.json();
+                    alert(`❌ ${data.error || 'Erreur suppression'}`);
+                }
+
+            } catch (error) {
+                alert(`❌ Erreur suppression: ${error.message}`);
+            }
+        }
+
+        // Lire un tag
+        async function lireTag(tagName) {
+            try {
+                const response = await fetch(`/api/read/${tagName}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(`❌ ${data.error}`);
+                    return;
+                }
+
+                alert(`📖 ${tagName}: ${data.valeur} (${data.qualite})`);
+
+            } catch (error) {
+                alert(`❌ Erreur lecture ${tagName}: ${error.message}`);
+            }
+        }
+
+        // Écrire un tag
+        async function ecrireTag(tagName) {
+            const valeur = prompt(`Écrire une valeur dans ${tagName}:`);
+            if (valeur === null) return;
+
+            try {
+                const response = await fetch(`/api/write/${tagName}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        valeur: valeur
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✏️ ${tagName} = ${data.valeur}`);
+                } else {
+                    alert(`❌ ${data.error || 'Erreur écriture'}`);
+                }
+
+            } catch (error) {
+                alert(`❌ Erreur écriture ${tagName}: ${error.message}`);
+            }
+        }
+
+        // Charger les tags par défaut
+        async function chargerTagsDefaut() {
+            if (!confirm('Charger les tags par défaut Siemens ? (Les tags existants seront conservés)')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/init_tags', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert('✅ Tags par défaut chargés');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert('❌ Erreur lors du chargement des tags par défaut');
+                }
+            } catch (error) {
+                alert(`❌ Erreur: ${error.message}`);
+            }
+        }
+
+        // Filtrer les tags (simulation)
+        function filtrerTags() {
+            // Dans un vrai projet, vous filtreriez les tags selon les critères
+            console.log('Filtrage des tags...');
+        }
+
+        function clearFilters() {
+            document.getElementById('search-tags').value = '';
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-access').value = '';
+            console.log('Filtres effacés');
+        }
+
+        // Actions en lot
+        function exportTags() {
+            const config = {
+                version: '1.0',
+                export_date: new Date().toISOString(),
+                tags: [], // Sera rempli via API
+                metadata: {
+                    export_par: 'IHM_Arthur_Gestion_Tags'
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(config, null, 2)], { 
+                type: 'application/json' 
+            });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tags_config_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert('✅ Configuration des tags exportée');
+        }
+
+        function importTags() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const config = JSON.parse(e.target.result);
+                        
+                        if (config.tags && Array.isArray(config.tags)) {
+                            const message = `Importer ${config.tags.length} tags ?\n\nCela peut remplacer des tags existants.`;
+                            
+                            if (confirm(message)) {
+                                alert('📂 Fonctionnalité d\'import à implémenter via API');
+                            }
+                        } else {
+                            alert('❌ Format de fichier invalide');
+                        }
+                    } catch (error) {
+                        alert('❌ Erreur lecture fichier: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+
+        function validateAllTags() {
+            alert('✅ Validation de tous les tags (fonctionnalité à implémenter)');
+        }
+
+        function deleteAllTags() {
+            if (!confirm('⚠️ ATTENTION: Supprimer TOUS les tags ?\n\nCette action est irréversible !')) {
+                return;
+            }
+            
+            alert('🗑️ Suppression en lot (fonctionnalité à implémenter)');
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Page Gestion Tags - Prête');
+            
+            // Initialiser l'helper des offsets
+            updateOffsetHelper();
+        });
+    </script>
+</body>
+</html>

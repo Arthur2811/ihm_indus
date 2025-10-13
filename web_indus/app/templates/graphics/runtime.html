@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runtime IHM - {{ page.nom_page if page.nom_page else 'Page IHM' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/graphics/runtime.css') }}">
+    
+    <!-- Bibliothèques externes pour icônes -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<style>
+    /* CSS RUNTIME SIMPLIFIÉ AVEC COULEURS DYNAMIQUES UNIQUEMENT */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: {{ page.couleur_fond if page.couleur_fond else '#F0F0F0' }};
+        overflow: hidden;
+        cursor: default;
+        user-select: none;
+    }
+
+    :root {
+        --page-background: {{ page.couleur_fond if page.couleur_fond else '#F0F0F0' }};
+        --page-width: {{ page.largeur_page if page.largeur_page else 1920 }}px;
+        --page-height: {{ page.hauteur_page if page.hauteur_page else 1080 }}px;
+    }
+
+    .runtime-container {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        background: var(--page-background);
+        overflow: hidden;
+    }
+
+    .runtime-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 10000;
+        transition: transform 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .runtime-header.hidden {
+        transform: translateY(-100%);
+    }
+
+    .runtime-title {
+        font-size: 1.2em;
+        font-weight: 600;
+    }
+
+    .runtime-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .runtime-btn {
+        padding: 5px 15px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 0.9em;
+    }
+
+    .runtime-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.9em;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #dc3545;
+        animation: pulse 2s infinite;
+    }
+
+    .status-dot.connected {
+        background: #28a745;
+    }
+
+    .continuous-indicator {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.8em;
+        color: #00ff00;
+        animation: continuousGlow 2s ease-in-out infinite alternate;
+    }
+
+    .navigation-indicator {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.8em;
+        color: #ffa500;
+        animation: navigationPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes continuousGlow {
+        from { 
+            color: #00ff00;
+            text-shadow: 0 0 5px #00ff00; 
+        }
+        to { 
+            color: #32cd32;
+            text-shadow: 0 0 10px #00ff00, 0 0 15px #00ff00; 
+        }
+    }
+
+    @keyframes navigationPulse {
+        0%, 100% { 
+            color: #ffa500;
+            text-shadow: 0 0 5px #ffa500; 
+        }
+        50% { 
+            color: #ffcc00;
+            text-shadow: 0 0 10px #ffa500, 0 0 15px #ffa500; 
+        }
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .runtime-canvas {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: var(--page-background);
+    }
+
+    /* OBJETS RUNTIME SIMPLIFIÉS - UNE SEULE COULEUR DYNAMIQUE */
+    .runtime-object {
+        position: absolute;
+        user-select: none;
+        transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+    }
+
+    .runtime-object.rectangle {
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    .runtime-object.circle {
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        border-radius: 50%;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    .runtime-object.button {
+        border: 2px solid rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+        color: white;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 
+            0 4px 8px rgba(0, 0, 0, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        transition: transform 0.1s ease-out, background-color 0.3s ease;
+    }
+
+    .runtime-object.button:hover {
+        transform: translateY(-1px);
+    }
+
+    .runtime-object.button:active {
+        transform: translateY(1px);
+    }
+
+    .runtime-object.button.clicked {
+        animation: instantClick 0.1s ease-out;
+    }
+
+    .runtime-object.text {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 5px 10px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .runtime-object.led {
+        border: 3px solid rgba(0, 0, 0, 0.2);
+        border-radius: 50%;
+        transition: box-shadow 0.3s ease, background-color 0.3s ease;
+    }
+
+    /* Objets icônes */
+    .runtime-object.icon {
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: default;
+        transition: opacity 0.1s ease, transform 0.3s ease, color 0.3s ease;
+    }
+
+    .unicode-icon {
+        font-family: 'Segoe UI Symbol', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Animations */
+    @keyframes instantClick {
+        0% { transform: scale(1); }
+        50% { transform: scale(0.95); }
+        100% { transform: scale(1); }
+    }
+
+    .runtime-object.value-changed {
+        animation: instantValueChange 0.15s ease-in-out;
+    }
+
+    @keyframes instantValueChange {
+        0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 1); }
+        50% { box-shadow: 0 0 0 8px rgba(0, 255, 0, 0.5); }
+        100% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0); }
+    }
+
+    .runtime-object.connected {
+        /* Pas de style spécial, couleur gérée dynamiquement */
+    }
+
+    .runtime-object.error {
+        border-color: rgba(220, 53, 69, 0.5);
+        animation: errorBlink 2s infinite;
+    }
+
+    @keyframes errorBlink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .value-tooltip {
+        position: absolute;
+        top: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        z-index: 1000;
+    }
+
+    .runtime-object:hover .value-tooltip {
+        opacity: 1;
+    }
+
+    .runtime-notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-size: 0.9em;
+        z-index: 10001;
+        animation: slideInBottom 0.3s ease-out;
+    }
+
+    .runtime-notification.navigation {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 2px solid #667eea;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .runtime-notification.error {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        border: 2px solid #dc3545;
+    }
+
+    @keyframes slideInBottom {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOutBottom {
+        from {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+    }
+
+    .debug-mode .runtime-object {
+        border: 1px dashed #007bff !important;
+    }
+
+    .debug-mode .runtime-object::before {
+        content: attr(data-debug-info);
+        position: absolute;
+        top: -15px;
+        left: 0;
+        font-size: 10px;
+        color: #007bff;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 1px 4px;
+        border-radius: 2px;
+    }
+
+    
+    
+</style>
+<body>
+    <div class="createRuntimeElement" id="createRuntimeElement"></div>
+    
+    <!-- Header de contrôle -->
+    <div class="runtime-header" id="runtime-header">
+        <div class="runtime-title">
+            🎯 Runtime IHM - {{ page.nom_page if page.nom_page else 'Page IHM' }}
+        </div>
+        
+        <div class="runtime-controls">
+            <!-- Statut connexion -->
+            <div class="status-indicator">
+                <div class="status-dot" id="connection-status"></div>
+                <span id="connection-text">Déconnecté</span>
+            </div>
+            
+            <!-- Indicateur de mode continu -->
+            <div class="continuous-indicator">
+                <span>🔄 CONTINU</span>
+            </div>
+            
+            <!-- Indicateur de navigation -->
+            <div class="navigation-indicator" id="navigation-indicator">
+                <span id="navigation-text">🧭 Navigation...</span>
+            </div>
+            
+            <!-- Contrôles -->
+            <button class="runtime-btn" onclick="toggleFullscreen()">📺 Plein écran</button>
+            <button class="runtime-btn" onclick="toggleDebugMode()">🔧 Debug</button>
+            <button class="runtime-btn" onclick="toggleContinuous()">⚡ Mode</button>
+            <button class="runtime-btn" onclick="refreshPage()">🔄 Actualiser</button>
+            <button class="runtime-btn" onclick="goBackToDesigner()">✏️ Éditeur</button>
+            <button class="runtime-btn" onclick="toggleHeader()">👁️ Masquer</button>
+        </div>
+    </div>
+
+    <!-- Canvas principal -->
+    <div class="runtime-container">
+        <div class="runtime-canvas" id="runtime-canvas">
+            <!-- Les objets runtime seront générés ici -->
+        </div>
+    </div>
+
+    <script>
+        // =================================================================
+        // RUNTIME SIMPLIFIÉ AVEC COULEURS DYNAMIQUES UNIQUEMENT
+        // =================================================================
+        
+        // Variables globales
+        let currentPage = {{ page.id_page if page.id_page else 'null' }};
+        let runtimeObjects = [];
+        let isConnected = false;
+        let debugMode = false;
+        let headerVisible = true;
+        let autoHideTimeout = null;
+        
+        // Mode continu
+        let continuousMode = true;
+        let continuousRunning = false;
+        let lastValues = {};
+        
+        // Gestion des clics
+        let clickQueue = [];
+        let processingClick = false;
+        
+        // Variables pour la navigation
+        let availablePages = [];
+        let navigationInProgress = false;
+        
+        console.log('🎨 Runtime IHM avec couleurs dynamiques pour page:', currentPage);
+        
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeRuntime();
+            setupEventListeners();
+            startContinuousUpdate();
+            setupAutoHideHeader();
+            loadAvailablePages();
+        });
+        
+        function initializeRuntime () {
+            console.log('🚀 Initialisation du runtime avec couleurs dynamiques');
+            loadRuntimeObjects();
+            checkConnection();
+        }
+        
+        function setupEventListeners() {
+            // Raccourcis clavier
+            document.addEventListener('keydown', function(e) {
+                switch(e.key) {
+                    case 'F11':
+                        e.preventDefault();
+                        toggleFullscreen();
+                        break;
+                    case 'F5':
+                        e.preventDefault();
+                        refreshPage();
+                        break;
+                    case 'Escape':
+                        if (document.fullscreenElement) {
+                            exitFullscreen();
+                        }
+                        break;
+                    case 'd':
+                    case 'D':
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            toggleDebugMode();
+                        }
+                        break;
+                    case 'c':
+                    case 'C':
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            toggleContinuous();
+                        }
+                        break;
+                    case 'h':
+                    case 'H':
+                        toggleHeader();
+                        break;
+                }
+            });
+            
+            // Mouvement de souris pour afficher le header
+            document.addEventListener('mousemove', function(e) {
+                if (e.clientY < 100) {
+                    showHeader();
+                }
+            });
+        }
+        
+        // Charger la liste des pages disponibles
+        async function loadAvailablePages() {
+            try {
+                const response = await fetch('/api/graphics/pages');
+                const result = await response.json();
+                
+                if (result.success) {
+                    availablePages = result.pages;
+                    console.log('📄 Pages disponibles chargées:', availablePages.length);
+                } else {
+                    console.error('❌ Erreur chargement pages:', result.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur réseau chargement pages:', error);
+            }
+        }
+        
+        async function loadRuntimeObjects() {
+            if (!currentPage) {
+                console.warn('⚠️ Aucune page courante');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/graphics/animations/${currentPage}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    runtimeObjects = result.animations;
+                    console.log('✅ Objets runtime chargés:', runtimeObjects.length);
+                    
+                    // DEBUG: Vérifier les icônes
+                    const iconObjects = runtimeObjects.filter(obj => obj.type === 'icon');
+                    console.log('🖼️ Icônes trouvées:', iconObjects.length);
+                    if (iconObjects.length > 0 && debugMode) {
+                        iconObjects.forEach(obj => {
+                            console.log('Icône:', obj.nom, 'Règles:', obj.regles);
+                        });
+                    }
+                    
+                    renderRuntimeObjects();
+                } else {
+                    console.error('❌ Erreur chargement objets:', result.error);
+                    showNotification('Erreur chargement des objets');
+                }
+            } catch (error) {
+                console.error('❌ Erreur réseau:', error);
+                showNotification('Erreur de connexion');
+            }
+        }
+        
+        function renderRuntimeObjects() {
+            const canvas = document.getElementById('runtime-canvas');
+            canvas.innerHTML = '';
+            
+            runtimeObjects.forEach(obj => {
+                const element = createRuntimeElement(obj);
+                canvas.appendChild(element);
+                
+                // Initialiser le cache des valeurs
+                lastValues[obj.id] = null;
+            });
+            
+            console.log('✅ Objets runtime rendus avec couleurs dynamiques');
+        }
+
+        // CRÉATION D'OBJETS RUNTIME SIMPLIFIÉE
+        function createRuntimeElement(obj) {
+            // Objets avec icône
+            if (obj.icon_data || obj.type === 'icon') {
+                return renderIconObject(obj);
+            }
+
+            // Objets classiques
+            return createStandardRuntimeObject(obj);
+        }
+
+        function createStandardRuntimeObject(obj) {
+            const element = document.createElement('div');
+            
+            element.id = `runtime-object-${obj.id}`;
+            element.className = `runtime-object ${obj.type}`;
+            element.setAttribute('data-object-id', obj.id);
+            element.setAttribute('data-tag', obj.tag_lie || '');
+            element.setAttribute('data-action', obj.action_clic || 'read');
+            
+            // Attributs pour navigation
+            if (obj.action_clic === 'navigate') {
+                let pageDestination = '';
+                if (obj.regles && obj.regles.page_destination) {
+                    pageDestination = obj.regles.page_destination;
+                } else if (obj.page_destination) {
+                    pageDestination = obj.page_destination;
+                }
+                element.setAttribute('data-page-destination', pageDestination);
+            }
+            
+            // Debug info
+            if (debugMode) {
+                element.setAttribute('data-debug-info', 
+                    `${obj.type} | ${obj.tag_lie || 'No tag'} | ${obj.action_clic || 'read'}`);
+            }
+            
+            // Style de base SIMPLIFIÉ - UNE SEULE COULEUR
+            element.style.left = obj.x + 'px';
+            element.style.top = obj.y + 'px';
+            element.style.width = obj.width + 'px';
+            element.style.height = obj.height + 'px';
+            element.style.setProperty('--object-color', obj.couleur_normale);
+            
+            // Appliquer la couleur normale par défaut
+            element.style.backgroundColor = obj.couleur_normale;
+            
+            // Contenu selon le type
+            if (obj.texte && ['button', 'text'].includes(obj.type)) {
+                element.textContent = obj.texte;
+            }
+            
+            // Tooltip de debug
+            if (obj.tag_lie) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'value-tooltip';
+                tooltip.textContent = `${obj.tag_lie}: --`;
+                element.appendChild(tooltip);
+            }
+            
+            // Configuration des événements de clic
+            setupObjectClickEvents(element, obj);
+            
+            return element;
+        }
+
+        // CORRECTION PRINCIPALE : Rendu des icônes corrigé
+        function renderIconObject(obj) {
+            const element = document.createElement('div');
+            element.id = `runtime-object-${obj.id}`;
+            element.className = `runtime-object ${obj.type}`;
+            element.setAttribute('data-object-id', obj.id);
+            element.setAttribute('data-tag', obj.tag_lie || '');
+            element.setAttribute('data-action', obj.action_clic || 'read');
+            
+            // Attributs pour navigation
+            if (obj.action_clic === 'navigate') {
+                let pageDestination = '';
+                if (obj.regles && obj.regles.page_destination) {
+                    pageDestination = obj.regles.page_destination;
+                } else if (obj.page_destination) {
+                    pageDestination = obj.page_destination;
+                }
+                element.setAttribute('data-page-destination', pageDestination);
+            }
+            
+            element.style.cssText = `
+                left: ${obj.x}px;
+                top: ${obj.y}px;
+                width: ${obj.width}px;
+                height: ${obj.height}px;
+                --object-color: ${obj.couleur_normale || '#CCCCCC'};
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+
+            // CORRECTION CRITIQUE : Récupération correcte des données d'icône
+            let iconData = null;
+            
+            // Essayer d'abord via regles.icon_data
+            if (obj.regles && obj.regles.icon_data) {
+                if (typeof obj.regles.icon_data === 'string') {
+                    try {
+                        iconData = JSON.parse(obj.regles.icon_data);
+                    } catch (e) {
+                        console.warn('Erreur parsing regles.icon_data:', e);
+                    }
+                } else if (typeof obj.regles.icon_data === 'object') {
+                    iconData = obj.regles.icon_data;
+                }
+            }
+            
+            // Fallback vers obj.icon_data si regles ne marche pas
+            if (!iconData && obj.icon_data) {
+                if (typeof obj.icon_data === 'string') {
+                    try {
+                        iconData = JSON.parse(obj.icon_data);
+                    } catch (e) {
+                        console.warn('Erreur parsing obj.icon_data:', e);
+                    }
+                } else if (typeof obj.icon_data === 'object') {
+                    iconData = obj.icon_data;
+                }
+            }
+
+            if (!iconData) {
+                console.error('Aucune donnée d\'icône trouvée pour l\'objet:', obj.id, obj);
+                element.innerHTML = `<div style="color: #dc3545; font-size: 2em;">⚠️</div>`;
+                setupObjectClickEvents(element, obj);
+                return element;
+            }
+
+            // Récupérer les propriétés d'icône
+            const iconSize = (obj.regles && obj.regles.icon_size) || obj.icon_size || 1.0;
+            const rotation = (obj.regles && obj.regles.icon_rotation) || obj.icon_rotation || 0;
+            const color = obj.couleur_normale || '#2a5298';
+
+            let iconHTML = '';
+            
+            console.log('Rendu icône:', iconData.nom_icon, 'Type:', iconData.type_source);
+            
+            // Unicode / Industrial
+            if (iconData.type_source === 'industrial' || iconData.is_unicode) {
+                const unicodeChar = iconData.unicode_char || '🔧';
+                iconHTML = `<span class="unicode-icon" style="font-size: ${2 * iconSize}em; color: ${color};">${unicodeChar}</span>`;
+
+            // External
+            } else if (iconData.type_source === 'external') {
+                if (iconData.external_library === 'feather') {
+                    iconHTML = `<i data-feather="${iconData.external_name}" 
+                                    style="width: ${24 * iconSize}px; height: ${24 * iconSize}px; color: ${color};">
+                                </i>`;
+                    // Recharger feather
+                    if (typeof feather !== 'undefined') setTimeout(() => feather.replace(), 100);
+                } else if (iconData.external_library === 'fontawesome') {
+                    iconHTML = `<i class="${iconData.external_name}" style="font-size: ${2 * iconSize}em; color: ${color};"></i>`;
+                } else {
+                    iconHTML = `<div style="font-size: ${2 * iconSize}em; color: ${color};">🔗</div>`;
+                }
+
+            // Upload
+            } else if (iconData.type_source === 'upload') {
+                let imageUrl = iconData.url;
+                if (!imageUrl && iconData.fichier_original) {
+                    imageUrl = `/static/icons/custom/${iconData.fichier_original}`;
+                }
+                
+                if (imageUrl) {
+                    const maxWidth = obj.width * 0.9 * iconSize;
+                    const maxHeight = obj.height * 0.9 * iconSize;
+                    iconHTML = `<img src="${imageUrl}" alt="${iconData.nom_icon || 'Icône'}"
+                                    style="max-width: ${maxWidth}px; max-height: ${maxHeight}px; object-fit: contain; display: block; margin: auto;"
+                                    onerror="console.error('Erreur chargement image:', this.src); this.style.display='none'; this.parentNode.innerHTML='📷';">`;
+                } else {
+                    iconHTML = `<div style="font-size: ${2 * iconSize}em; color: ${color};">📷</div>`;
+                }
+            } else {
+                iconHTML = `<div style="font-size: ${2 * iconSize}em; color: ${color};">❓</div>`;
+            }
+
+            element.innerHTML = iconHTML;
+
+            // Rotation
+            if (rotation) {
+                element.style.transform = `rotate(${rotation}deg)`;
+            }
+
+            // Événements de clic pour navigation
+            setupObjectClickEvents(element, obj);
+
+            return element;
+        }
+        
+        // Configuration des événements de clic avec navigation
+        function setupObjectClickEvents(element, obj) {
+            const action = obj.action_clic || 'read';
+            
+            // Exclure SEULEMENT les icônes qui n'ont PAS d'action de clic
+            if (obj.type === 'icon' && action === 'read') {
+                return; // Icônes non-interactives
+            }
+            
+            if (['write', 'toggle', 'navigate'].includes(action)) {
+                element.style.cursor = 'pointer';
+                
+                element.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (navigationInProgress) {
+                        console.log('Navigation en cours, clic ignoré');
+                        return;
+                    }
+                    
+                    // Ajouter à la queue de traitement
+                    clickQueue.push({ obj, element });
+                    processClickQueue();
+                });
+            }
+        }
+        
+        // SYSTÈME DE RAFRAÎCHISSEMENT CONTINU
+        function startContinuousUpdate() {
+            if (continuousRunning) return;
+            
+            continuousRunning = true;
+            console.log('🔄 Démarrage du rafraîchissement continu');
+            
+            // Fonction récursive qui s'appelle en continu
+            function continuousLoop() {
+                if (!continuousRunning || navigationInProgress) return;
+                
+                updateObjectValues().then(() => {
+                    // Relancer immédiatement la prochaine lecture
+                    if (continuousMode) {
+                        // Mode ultra-rapide : 0ms de délai
+                        requestAnimationFrame(continuousLoop);
+                    } else {
+                        // Mode normal : petit délai
+                        setTimeout(continuousLoop, 100);
+                    }
+                }).catch(error => {
+                    console.error('❌ Erreur dans la boucle continue:', error);
+                    // En cas d'erreur, attendre un peu avant de reprendre
+                    setTimeout(continuousLoop, 500);
+                });
+            }
+            
+            // Démarrer la boucle
+            continuousLoop();
+        }
+        
+        function stopContinuousUpdate() {
+            continuousRunning = false;
+            console.log('⏹️ Arrêt du rafraîchissement continu');
+        }
+        
+        // TRAITEMENT DES CLICS EN QUEUE AVEC NAVIGATION
+        async function processClickQueue() {
+            if (processingClick || clickQueue.length === 0) return;
+            
+            processingClick = true;
+            
+            while (clickQueue.length > 0) {
+                const { obj, element } = clickQueue.shift();
+                await handleInstantClick(obj, element);
+                
+                // Petit délai entre les clics pour éviter la surcharge
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            processingClick = false;
+        }
+        
+        // CLIC INSTANTANÉ avec prédiction ET NAVIGATION
+        async function handleInstantClick(obj, element) {
+            const action = obj.action_clic || 'read';
+            
+            console.log('⚡ Clic instantané:', obj.nom, 'Action:', action);
+            
+            // Animation immédiate
+            element.classList.add('clicked');
+            setTimeout(() => element.classList.remove('clicked'), 100);
+            
+            // LOGIQUE NAVIGATION
+            if (action === 'navigate') {
+                await handlePageNavigation(obj, element);
+                return;
+            }
+            
+            // Logique existante pour les autres actions...
+            if (!obj.tag_lie) {
+                console.warn('⚠️ Objet sans tag lié:', obj.nom);
+                showNotification('⚠️ Objet non lié à un tag');
+                return;
+            }
+            
+            const blockKey = `block_${obj.id}`;
+            window[blockKey] = true;
+            
+            let predictedValue = null;
+            
+            if (action === 'write' && obj.valeur_ecriture) {
+                predictedValue = obj.valeur_ecriture;
+                try {
+                    if (predictedValue.toLowerCase() === 'true') predictedValue = true;
+                    else if (predictedValue.toLowerCase() === 'false') predictedValue = false;
+                    else if (!isNaN(predictedValue)) predictedValue = Number(predictedValue);
+                } catch (e) {}
+            } else if (action === 'toggle') {
+                const currentValue = lastValues[obj.id];
+                predictedValue = !Boolean(currentValue);
+            }
+            
+            if (predictedValue !== null) {
+                console.log(`🔮 Prédiction pour objet ${obj.id}: ${lastValues[obj.id]} → ${predictedValue}`);
+                lastValues[obj.id] = predictedValue;
+                updateObjectDisplay(obj.id, { valeur: predictedValue, qualite: 'PREDICTED', couleur_actuelle: obj.couleur_normale }, true);
+            }
+            
+            // Envoyer l'action en arrière-plan
+            try {
+                const response = await fetch('/api/graphics/runtime/action', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        animation_id: obj.id
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Action confirmée:', result.message);
+                    setTimeout(() => {
+                        window[blockKey] = false;
+                        console.log(`🔓 Déblocage lecture pour objet ${obj.id}`);
+                    }, 200);
+                } else {
+                    console.error('❌ Erreur action:', result.error);
+                    showNotification(`❌ ${result.error || 'Erreur action'}`);
+                    window[blockKey] = false;
+                }
+            } catch (error) {
+                console.error('❌ Erreur réseau action:', error);
+                showNotification('❌ Erreur de communication');
+                window[blockKey] = false;
+            }
+        }
+
+        // Gérer la navigation entre pages
+        async function handlePageNavigation(obj, element) {
+            console.log('🧭 Navigation demandée par objet:', obj.nom);
+            
+            if (navigationInProgress) {
+                console.log('🚫 Navigation déjà en cours');
+                return;
+            }
+            
+            // Récupérer la page de destination
+            let pageDestination = null;
+            
+            // Chercher dans les règles
+            if (obj.regles && obj.regles.page_destination) {
+                pageDestination = obj.regles.page_destination;
+            } else if (obj.page_destination) {
+                pageDestination = obj.page_destination;
+            }
+            
+            if (!pageDestination) {
+                console.warn('⚠️ Aucune page de destination configurée pour:', obj.nom);
+                showNotification('⚠️ Aucune page de destination configurée', 'error');
+                return;
+            }
+            
+            console.log('🎯 Navigation vers page ID:', pageDestination);
+            
+            // Vérifier que la page existe
+            const targetPage = availablePages.find(p => p.id == pageDestination);
+            
+            if (!targetPage) {
+                console.error('❌ Page de destination introuvable:', pageDestination);
+                showNotification('❌ Page de destination introuvable', 'error');
+                return;
+            }
+            
+            // Démarrer la navigation
+            navigationInProgress = true;
+            showNavigationIndicator(targetPage.nom);
+            
+            // Feedback visuel de navigation
+            element.classList.add('navigating');
+            showNotification(`🧭 Navigation vers "${targetPage.nom}"`, 'navigation');
+            
+            // Arrêter le rafraîchissement continu temporairement
+            const wasRunning = continuousRunning;
+            if (wasRunning) {
+                continuousRunning = false;
+                console.log('⏸️ Rafraîchissement continu pausé pour navigation');
+            }
+            
+            // Navigation vers la nouvelle page avec délai pour les animations
+            setTimeout(() => {
+                console.log(`📄 Redirection vers: /graphics/runtime/${pageDestination}`);
+                window.location.href = `/graphics/runtime/${pageDestination}`;
+            }, 800);
+        }
+        
+        // Afficher l'indicateur de navigation
+        function showNavigationIndicator(pageName) {
+            const indicator = document.getElementById('navigation-indicator');
+            const text = document.getElementById('navigation-text');
+            
+            if (indicator && text) {
+                text.textContent = `🧭 Navigation vers "${pageName}"...`;
+                indicator.style.display = 'block';
+            }
+        }
+        
+        // MISE À JOUR CONTINUE DES VALEURS AVEC COULEURS DYNAMIQUES
+        async function updateObjectValues() {
+            if (!currentPage || runtimeObjects.length === 0 || navigationInProgress) return;
+            
+            try {
+                const response = await fetch(`/api/graphics/runtime/values/${currentPage}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // DEBUG - Voir toutes les données reçues
+                    if (debugMode) {
+                        console.log('🔍 DEBUG - Données complètes reçues:', result);
+                    }
+                    
+                    // Mise à jour du statut de connexion
+                    const connectionInfo = result.connection_status || {};
+                    updateConnectionStatus(connectionInfo.connected || false, connectionInfo);
+                    
+                    // Traitement des valeurs avec couleurs dynamiques UNIQUEMENT
+                    Object.entries(result.valeurs).forEach(([objectId, data]) => {
+                        // DEBUG COULEURS - Voir les données de couleur pour chaque objet
+                        if (debugMode && data.couleur_dynamique) {
+                            console.log(`🎨 DEBUG - Objet ${objectId} couleur:`, {
+                                couleur_actuelle: data.couleur_actuelle,
+                                couleur_dynamique: data.couleur_dynamique,
+                                valeur: data.valeur
+                            });
+                        }
+                        
+                        const blockKey = `block_${objectId}`;
+                        if (window[blockKey]) {
+                            console.log(`🔒 Lecture bloquée pour objet ${objectId} (action en cours)`);
+                            return;
+                        }
+                        
+                        const previousValue = lastValues[objectId];
+                        const currentValue = data.valeur;
+                        
+                        const valueChanged = previousValue !== currentValue;
+                        if (valueChanged) {
+                            console.log(`📊 Valeur changée - Objet ${objectId}: ${previousValue} → ${currentValue}`);
+                            lastValues[objectId] = currentValue;
+                        }
+                        
+                        // Appliquer la couleur dynamique (couleur_actuelle du serveur)
+                        updateObjectDisplay(objectId, data, valueChanged);
+                    });
+                    
+                } else {
+                    updateConnectionStatus(false);
+                }
+            } catch (error) {
+                updateConnectionStatus(false);
+            }
+        }
+        
+        // MISE À JOUR SIMPLIFIÉE DES OBJETS (COULEUR DYNAMIQUE UNIQUEMENT)
+        function updateObjectDisplay(objectId, data, valueChanged) {
+            const element = document.getElementById(`runtime-object-${objectId}`);
+            if (!element) return;
+            
+            const obj = runtimeObjects.find(o => o.id == objectId);
+            if (!obj) return;
+            
+            // Animation rapide seulement si valeur a changé
+            if (valueChanged) {
+                element.classList.add('value-changed');
+                setTimeout(() => element.classList.remove('value-changed'), 150);
+            }
+            
+            // Récupérer la couleur finale du serveur (couleur_actuelle)
+            const finalColor = data.couleur_actuelle || obj.couleur_normale;
+            
+            // Log si couleur dynamique appliquée
+            if (data.couleur_dynamique && debugMode) {
+                console.log(`🎨 Couleur dynamique appliquée à ${obj.nom}: ${finalColor} (valeur: ${data.valeur})`);
+            }
+            
+            // Appliquer selon le type d'objet - VERSION SIMPLIFIÉE
+            switch (obj.type) {
+                case 'led':
+                    updateLEDColor(element, obj, finalColor, data.valeur);
+                    break;
+                case 'rectangle':
+                case 'circle':
+                    updateShapeColor(element, obj, finalColor);
+                    break;
+                case 'button':
+                    updateButtonColor(element, obj, finalColor);
+                    break;
+                case 'text':
+                    updateTextColor(element, obj, finalColor, data.valeur);
+                    break;
+                case 'icon':
+                    updateIconColor(element, obj, finalColor, data.valeur);
+                    break;
+            }
+            
+            // Mise à jour du tooltip
+            const tooltip = element.querySelector('.value-tooltip');
+            if (tooltip) {
+                const qualityIcon = data.qualite === 'PREDICTED' ? '🔮' : '';
+                const colorIcon = data.couleur_dynamique ? '🎨' : '';
+                tooltip.textContent = `${obj.tag_lie}: ${data.valeur} ${qualityIcon}${colorIcon}`;
+            }
+            
+            // Gestion des erreurs
+            if (data.qualite === 'ERROR') {
+                element.classList.add('error');
+            } else {
+                element.classList.remove('error');
+                element.classList.add('connected');
+            }
+        }
+        
+        // FONCTIONS DE MISE À JOUR SIMPLIFIÉES (UNE SEULE COULEUR)
+        function updateLEDColor(element, obj, color, value) {
+            element.style.backgroundColor = color;
+            element.style.setProperty('--object-color', color);
+            
+            // Effet lumineux si valeur vraie/active
+            if (Boolean(value)) {
+                element.style.boxShadow = `
+                    0 0 10px ${color},
+                    0 0 20px ${color},
+                    inset 0 0 10px rgba(255, 255, 255, 0.3)
+                `;
+                element.classList.add('active');
+            } else {
+                element.style.boxShadow = `
+                    0 0 5px ${color},
+                    inset 0 0 5px rgba(255, 255, 255, 0.3)
+                `;
+                element.classList.remove('active');
+            }
+        }
+
+        function updateShapeColor(element, obj, color) {
+            element.style.backgroundColor = color;
+            element.style.setProperty('--object-color', color);
+        }
+
+        function updateButtonColor(element, obj, color) {
+            element.style.backgroundColor = color;
+            element.style.setProperty('--object-color', color);
+            
+            // Ajuster la couleur du texte pour le contraste
+            const textColor = getContrastColor(color);
+            element.style.color = textColor;
+        }
+
+        function updateTextColor(element, obj, color, value) {
+            // Pour les textes, appliquer la couleur au texte lui-même
+            element.style.color = color;
+            
+            // Mettre à jour le contenu si nécessaire
+            let displayText = obj.texte || '';
+            
+            if (displayText.includes('{value}')) {
+                displayText = displayText.replace('{value}', value);
+            } else if (displayText && value !== null && value !== undefined) {
+                displayText = `${displayText}: ${value}`;
+            } else if (!displayText) {
+                displayText = String(value);
+            }
+            
+            element.textContent = displayText;
+        }
+
+        function updateIconColor(element, obj, color, value) {
+            // Pour les icônes, appliquer la couleur aux éléments internes
+            const iconElement = element.querySelector('.unicode-icon, i:not([data-feather]), svg');
+            
+            if (iconElement) {
+                iconElement.style.color = color;
+                iconElement.style.setProperty('--object-color', color);
+            }
+            
+            // Pour les images, utiliser un filtre de couleur simple
+            const imgElement = element.querySelector('img');
+            if (imgElement) {
+                // Créer un effet de teinte basé sur la couleur
+                const hue = hexToHue(color);
+                imgElement.style.filter = `hue-rotate(${hue}deg) saturate(1.2)`;
+            }
+            
+            // Animation d'état pour les icônes
+            if (Boolean(value)) {
+                element.classList.add('active');
+                element.style.transform = element.style.transform.replace('scale(1)', '') + ' scale(1.05)';
+            } else {
+                element.classList.remove('active');
+                element.style.transform = element.style.transform.replace(/scale\([^)]*\)/, '') + ' scale(1)';
+            }
+        }
+        
+        // FONCTIONS UTILITAIRES SIMPLIFIÉES
+        function getContrastColor(hexColor) {
+            // Convertir hex en RGB
+            const r = parseInt(hexColor.slice(1, 3), 16);
+            const g = parseInt(hexColor.slice(3, 5), 16);
+            const b = parseInt(hexColor.slice(5, 7), 16);
+            
+            // Calculer la luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            
+            // Retourner noir ou blanc selon la luminance
+            return luminance > 0.5 ? '#000000' : '#FFFFFF';
+        }
+
+        function hexToHue(hex) {
+            // Convertir couleur hex en teinte HSL pour les filtres
+            const r = parseInt(hex.slice(1, 3), 16) / 255;
+            const g = parseInt(hex.slice(3, 5), 16) / 255;
+            const b = parseInt(hex.slice(5, 7), 16) / 255;
+            
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            let h;
+            
+            if (max === min) {
+                h = 0; // Gris
+            } else {
+                const d = max - min;
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            
+            return Math.round(h * 360);
+        }
+        
+        function updateConnectionStatus(connected, connectionInfo = {}) {
+            isConnected = connected;
+            const statusDot = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            
+            if (connected) {
+                statusDot.classList.add('connected');
+                
+                if (connectionInfo.simulation_mode) {
+                    statusText.textContent = `Connecté (Simulation)`;
+                } else {
+                    statusText.textContent = `Connecté (${connectionInfo.ip_address || 'Réel'})`;
+                }
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Déconnecté';
+            }
+        }
+        
+        async function checkConnection() {
+            try {
+                const response = await fetch('/api/graphics/runtime/values/' + currentPage);
+                updateConnectionStatus(response.ok);
+            } catch (error) {
+                updateConnectionStatus(false);
+            }
+        }
+        
+        // =================================================================
+        // CONTRÔLES INTERFACE
+        // =================================================================
+        
+        function toggleContinuous() {
+            continuousMode = !continuousMode;
+            console.log(`🔄 Mode ${continuousMode ? 'CONTINU' : 'NORMAL'} activé`);
+            showNotification(`Mode ${continuousMode ? 'CONTINU' : 'NORMAL'} activé`);
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    console.log('📺 Mode plein écran activé');
+                    showNotification('Mode plein écran activé (Echap pour quitter)');
+                });
+            } else {
+                exitFullscreen();
+            }
+        }
+        
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().then(() => {
+                    console.log('📺 Mode plein écran désactivé');
+                });
+            }
+        }
+        
+        function toggleDebugMode() {
+            debugMode = !debugMode;
+            document.body.classList.toggle('debug-mode', debugMode);
+            
+            renderRuntimeObjects();
+            
+            console.log('🔧 Mode debug:', debugMode ? 'activé' : 'désactivé');
+            showNotification(`Debug ${debugMode ? 'activé' : 'désactivé'} - ${debugMode ? 'Couleurs visibles dans console' : ''}`);
+        }
+        
+        function refreshPage() {
+            console.log('🔄 Actualisation complète');
+            lastValues = {};
+            clickQueue = [];
+            navigationInProgress = false;
+            loadRuntimeObjects();
+            loadAvailablePages();
+            showNotification('Page actualisée');
+        }
+        
+        function goBackToDesigner() {
+            stopContinuousUpdate();
+            if (currentPage) {
+                window.location.href = `/graphics/designer/${currentPage}`;
+            } else {
+                window.location.href = '/graphics/designer';
+            }
+        }
+        
+        function toggleHeader() {
+            headerVisible = !headerVisible;
+            const header = document.getElementById('runtime-header');
+            header.classList.toggle('hidden', !headerVisible);
+        }
+        
+        function setupAutoHideHeader() {
+            const AUTO_HIDE_DELAY = 5000;
+            
+            function resetAutoHide() {
+                if (autoHideTimeout) {
+                    clearTimeout(autoHideTimeout);
+                }
+                
+                showHeader();
+                
+                autoHideTimeout = setTimeout(() => {
+                    hideHeader();
+                }, AUTO_HIDE_DELAY);
+            }
+            
+            document.addEventListener('mousemove', resetAutoHide);
+            resetAutoHide();
+        }
+        
+        function showHeader() {
+            if (headerVisible) {
+                const header = document.getElementById('runtime-header');
+                header.classList.remove('hidden');
+            }
+        }
+        
+        function hideHeader() {
+            const header = document.getElementById('runtime-header');
+            header.classList.add('hidden');
+        }
+        
+        function showNotification(message, type = 'info') {
+            const existing = document.querySelectorAll('.runtime-notification');
+            existing.forEach(n => n.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `runtime-notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Durée selon le type
+            let duration = 3000;
+            if (type === 'navigation') duration = 2000;
+            if (type === 'error') duration = 5000;
+            
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    notification.style.animation = 'slideOutBottom 0.3s ease-in';
+                    setTimeout(() => {
+                        if (document.body.contains(notification)) {
+                            document.body.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, duration);
+        }
+        
+        // Nettoyage à la fermeture
+        window.addEventListener('beforeunload', function() {
+            stopContinuousUpdate();
+        });
+        
+        // Gestion de la visibilité de l'onglet (pause quand l'onglet n'est pas visible)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('⏸️ Onglet masqué - ralentissement du rafraîchissement');
+                continuousMode = false;
+            } else {
+                console.log('▶️ Onglet visible - reprise du rafraîchissement rapide');
+                continuousMode = true;
+                // Recharger les pages disponibles si l'onglet redevient actif
+                loadAvailablePages();
+            }
+        });
+        
+        console.log('🎨 Runtime IHM avec COULEURS DYNAMIQUES prêt !');
+        console.log('🎮 Fonctionnalités:');
+        console.log('  - Couleurs dynamiques selon règles');
+        console.log('  - Debug mode pour voir les couleurs (Ctrl+D)');
+        console.log('  - Rafraîchissement continu optimisé');
+        console.log('  - Support complet icônes avec couleurs');
+        console.log('  - Navigation entre pages');
+        console.log('  - Plus de couleur_active fixe - tout est dynamique !');
+    </script>
+</body>
+</html>

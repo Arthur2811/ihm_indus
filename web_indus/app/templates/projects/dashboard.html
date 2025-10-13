@@ -1,0 +1,126 @@
+dashboard_html_content = '''<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - IHM Arthur</title>
+    <link rel="stylesheet" href="/static/css/projects/dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 Dashboard IHM Industrielle</h1>
+            <p>
+                Bienvenue {{ user_name }}
+                <span class="role-badge role-{{ user_role.lower() }}">{{ user_role }}</span>
+            </p>
+        </div>
+        
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-value" id="automate-status">⏳</div>
+                <div class="status-label">État Automate</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="tags-count">-</div>
+                <div class="status-label">Tags Configurés</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="users-count">-</div>
+                <div class="status-label">Utilisateurs</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value">✅</div>
+                <div class="status-label">Système</div>
+            </div>
+        </div>
+        
+        <div class="menu">
+            <a href="{{ url_for('main.index') }}" class="menu-card">
+                <span class="icon">🖧</span>
+                <h3>Connexion Automate</h3>
+                <p>Configuration et connexion aux automates Siemens S7</p>
+            </a>
+            
+            <a href="{{ url_for('main.tags') }}" class="menu-card">
+                <span class="icon">🏷️</span>
+                <h3>Gestion Tags</h3>
+                <p>Configuration des variables automate</p>
+            </a>
+            
+            <a href="{{ url_for('main.supervision') }}" class="menu-card">
+                <span class="icon">🔖</span>
+                <h3>Tags Espion</h3>
+                <p>Monitoring temps réel des variables</p>
+            </a>
+            
+            <a href="{{ url_for('main.graphics_designer') }}" class="menu-card">
+                <span class="icon">🎨</span>
+                <h3>Éditeur Graphique</h3>
+                <p>Création d'interfaces de supervision</p>
+            </a>
+            
+            {% if user_role == 'ADMIN' %}
+            <a href="{{ url_for('main.user_management') }}" class="menu-card">
+                <span class="icon">👥</span>
+                <h3>Gestion Utilisateurs</h3>
+                <p>Administration des comptes utilisateur</p>
+            </a>
+            {% endif %}
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px;">
+            <a href="{{ url_for('main.logout') }}" class="logout-btn">
+                🚪 Se Déconnecter
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        console.log('🏭 Dashboard IHM chargé pour {{ user_role }}');
+        
+        // Vérifier le statut de l'automate
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                const status = document.getElementById('automate-status');
+                if (data.connected) {
+                    status.textContent = '✅';
+                    status.style.color = '#28a745';
+                } else {
+                    status.textContent = '❌';
+                    status.style.color = '#dc3545';
+                }
+            })
+            .catch(error => {
+                document.getElementById('automate-status').textContent = '⚠️';
+            });
+        
+        // Vérifier le nombre de tags
+        fetch('/api/tags')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('tags-count').textContent = data.nombre_tags;
+                }
+            })
+            .catch(error => {
+                document.getElementById('tags-count').textContent = '?';
+            });
+        
+        // Vérifier le nombre d'utilisateurs (si admin)
+        {% if user_role == 'ADMIN' %}
+        fetch('/api/admin/users')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('users-count').textContent = data.total;
+                }
+            })
+            .catch(error => {
+                document.getElementById('users-count').textContent = '?';
+            });
+        {% endif %}
+    </script>
+</body>
+</html>

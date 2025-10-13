@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accès Refusé - IHM Industrielle</title>
+    <link rel="stylesheet" href="/static/css/auth/acces_refuse.css">
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">🚫</div>
+        <h1 class="error-title">Accès Refusé</h1>
+        <p class="error-message">
+            Vous n'avez pas les privilèges nécessaires pour accéder à cette ressource.
+            Contactez votre administrateur système si vous pensez que c'est une erreur.
+        </p>
+
+        <div class="permission-info">
+            <h4>Niveaux d'accès requis :</h4>
+            <ul>
+                <li><strong>Opérateur (OP)</strong> : Consultation des données</li>
+                <li><strong>Automaticien (AUTO)</strong> : Configuration technique</li>
+                <li><strong>Administrateur (ADMIN)</strong> : Gestion complète</li>
+            </ul>
+        </div>
+
+        <div class="action-buttons">
+            <a href="/dashboard" class="btn btn-primary">Retour au tableau de bord</a>
+            <a href="/logout" class="btn btn-secondary">Se déconnecter</a>
+        </div>
+    </div>
+</body>
+</html>

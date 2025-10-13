@@ -1,0 +1,141 @@
+# =================================================================
+# DOCKER COMPOSE - IHM INDUSTRIELLE ARTHUR
+# =================================================================
+
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: ihm_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BD_MOT_DE_PASSE}
+      MYSQL_DATABASE: ${BD_NOM}
+      MYSQL_USER: ${BD_UTILISATEUR}
+      MYSQL_PASSWORD: ${BD_MOT_DE_PASSE}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${BD_PORT}:3306"
+    networks:
+      - ihm_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+
+  # Application Flask IHM
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ihm_web
+    restart: unless-stopped
+    environment:
+      - BD_HOTE=mysql
+      - BD_PORT=3306
+      - BD_UTILISATEUR=${BD_UTILISATEUR}
+      - BD_MOT_DE_PASSE=${BD_MOT_DE_PASSE}
+      - BD_NOM=${BD_NOM}
+      - CLE_SECRETE=${CLE_SECRETE}
+      - MODE_DEBUG=False
+      - AUTOMATE_IP=${AUTOMATE_IP}
+      - AUTOMATE_PORT=${AUTOMATE_PORT}
+      - MODE_COMMUNICATION=${MODE_COMMUNICATION}
+      - TIMEOUT_CONNEXION=${TIMEOUT_CONNEXION}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - ihm_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Interface d'administration MySQL (optionnel)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ihm_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${BD_UTILISATEUR}
+      PMA_PASSWORD: ${BD_MOT_DE_PASSE}
+      MYSQL_ROOT_PASSWORD: ${BD_MOT_DE_PASSE}
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - ihm_network
+    profiles:
+      - admin  # Démarrage avec: docker-compose --profile admin up
+
+  # Monitoring avec Prometheus (optionnel)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ihm_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - ihm_network
+    profiles:
+      - monitoring
+
+  # Grafana pour les dashboards (optionnel)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ihm_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${BD_MOT_DE_PASSE}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - ihm_network
+    profiles:
+      - monitoring
+
+volumes:
+  mysql_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  ihm_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

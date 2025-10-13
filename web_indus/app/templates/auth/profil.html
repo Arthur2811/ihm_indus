@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Profil - IHM Industrielle</title>
+    <link rel="stylesheet" href="/static/css/auth/profil.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">IHM Industrielle Arthur</div>
+            <div class="nav-links">
+                <a href="/dashboard">Tableau de Bord</a>
+                <a href="/logout">Déconnexion</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        {% if user.is_hardcoded %}
+        <div class="hardcoded-notice">
+            <strong>Mode administrateur système</strong> - Vous utilisez le compte administrateur en dur. 
+            Les informations détaillées ne sont pas disponibles pour ce compte.
+        </div>
+        {% endif %}
+
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    {{ user.nom_complet[0] if user.nom_complet else 'U' }}
+                </div>
+                <h1>{{ user.nom_complet }}</h1>
+                <span class="role-badge role-{{ user.role.lower() }}">{{ user.role }}</span>
+            </div>
+
+            <div class="profile-details">
+                <div class="detail-group">
+                    <h3>Informations de connexion</h3>
+                    <div class="detail-item">
+                        <span class="detail-label">Nom d'utilisateur:</span>
+                        <span class="detail-value">{{ user.username }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Rôle:</span>
+                        <span class="detail-value">{{ user.role }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Niveau d'accès:</span>
+                        <span class="detail-value">{{ user.role_level }}</span>
+                    </div>
+                    {% if user.login_time %}
+                    <div class="detail-item">
+                        <span class="detail-label">Connecté depuis:</span>
+                        <span class="detail-value">{{ user.login_time[:19] }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if user_details and not user.is_hardcoded %}
+                <div class="detail-group">
+                    <h3>Informations personnelles</h3>
+                    <div class="detail-item">
+                        <span class="detail-label">Nom:</span>
+                        <span class="detail-value">{{ user_details.nom_utilisateur }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Prénom:</span>
+                        <span class="detail-value">{{ user_details.prenom_utilisateur }}</span>
+                    </div>
+                    {% if user_details.email_utilisateur %}
+                    <div class="detail-item">
+                        <span class="detail-label">Email:</span>
+                        <span class="detail-value">{{ user_details.email_utilisateur }}</span>
+                    </div>
+                    {% endif %}
+                    {% if user_details.telephone_utilisateur %}
+                    <div class="detail-item">
+                        <span class="detail-label">Téléphone:</span>
+                        <span class="detail-value">{{ user_details.telephone_utilisateur }}</span>
+                    </div>
+                    {% endif %}
+                    {% if user_details.date_creation_utilisateur %}
+                    <div class="detail-item">
+                        <span class="detail-label">Compte créé le:</span>
+                        <span class="detail-value">{{ user_details.date_creation_utilisateur[:10] }}</span>
+                    </div>
+                    {% endif %}
+                    {% if user_details.derniere_connexion %}
+                    <div class="detail-item">
+                        <span class="detail-label">Dernière connexion:</span>
+                        <span class="detail-value">{{ user_details.derniere_connexion[:19] }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="actions">
+                <a href="/dashboard" class="btn btn-primary">Retour au tableau de bord</a>
+                {% if user.role_level >= 3 %}
+                <a href="/admin/users" class="btn btn-secondary">Gestion utilisateurs</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

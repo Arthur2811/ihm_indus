@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Éditeur Graphique IHM - {{ page.nom_page if page.nom_page else 'Nouvelle Page' }}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/graphics/designer.css') }}">
+    
+    <!-- Bibliothèques externes pour icônes -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<style>
+    :root {
+        --page-background: {{ page.couleur_fond if page.couleur_fond else '#FFFFFF' }};
+        --page-width: {{ page.largeur_page if page.largeur_page else 1920 }}px;
+        --page-height: {{ page.hauteur_page if page.hauteur_page else 1080 }}px;
+    }
+    .canvas {
+        background-color: var(--page-background);
+        width: var(--page-width);
+        height: var(--page-height);
+    }
+
+    /* Styles pour les règles de couleur */
+    .color-rules-panel {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 20px;
+        display: none;
+    }
+
+    .color-rules-panel h4, .color-rules-panel h5 {
+        margin-bottom: 15px;
+        color: white;
+    }
+
+    .rule-form {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .form-row {
+        margin-bottom: 12px;
+    }
+
+    .form-row label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+
+    .form-row input, .form-row select {
+        width: 100%;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.9);
+        color: #333;
+        font-size: 0.9em;
+        box-sizing: border-box;
+    }
+
+    .condition-group {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+    }
+
+    .condition-group select {
+        flex: 0 0 120px;
+    }
+
+    .color-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .color-row input[type="color"] {
+        width: 60px;
+        height: 40px;
+        padding: 2px;
+        cursor: pointer;
+    }
+
+    .color-preview {
+        flex: 1;
+        padding: 10px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        background-color: var(--preview-color, #ff0000);
+        color: white;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        justify-content: flex-end;
+    }
+
+    .rules-list {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 15px;
+    }
+
+    .rules-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .rules-actions {
+        display: flex;
+        gap: 5px;
+    }
+
+    .rule-item {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .rule-item.inactive {
+        opacity: 0.6;
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    .rule-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .rule-header-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .rule-name {
+        font-weight: bold;
+        color: white;
+    }
+
+    .rule-status {
+        font-size: 0.8em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .rule-details {
+        font-size: 0.85em;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .rule-condition {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+    }
+
+    .rule-color-badge {
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        display: inline-block;
+    }
+
+    .rule-actions {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+
+    .no-rules {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.7);
+        padding: 20px;
+        font-style: italic;
+    }
+
+    .btn-toggle {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-toggle:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-test {
+        background: linear-gradient(45deg, #17a2b8, #138496);
+        color: white;
+    }
+</style>
+<body>
+    <div class="editor-layout">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎨 Éditeur Graphique IHM</h1>
+            
+            <div class="header-controls">
+                <button id="save-button" class="btn btn-success btn-small" onclick="savePage()">
+                    💾 Sauvegarder
+                </button>
+                <button class="btn btn-primary btn-small" onclick="testRuntime()">
+                    ▶️ Runtime
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="deleteSelected()">
+                    🗑️ Supprimer
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <div class="navigation">
+                <a href="{{ url_for('main.index') }}" class="nav-btn">🖧 Connexion</a>
+                <a href="{{ url_for('main.tags') }}" class="nav-btn">🏷 Tags</a>
+                <a href="{{ url_for('main.supervision') }}" class="nav-btn">📖 Tags Espion</a>
+                <a href="{{ url_for('main.graphics_designer') }}" class="nav-btn active">🎨 Éditeur</a>
+                <a href="{{ url_for('main.icons_management') }}" class="nav-btn">🖼️ Icônes</a>
+                <a href="{{ url_for('main.user_management') }}" class="nav-btn">👥 Utilisateurs</a>
+                <a href="{{ url_for('main.projects_management') }}" class="nav-btn">📁 Projet</a>
+                <a href="{{ url_for('main.dashboard') }}" class="nav-btn">📊 Dashboard</a>
+                <form action="{{ url_for('main.disconnect_automate') }}" method="POST" style="display:inline;">
+                    <button type="submit" class="nav-btn">🔌 Déconnexion</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Palette d'objets et d'icônes -->
+        <div class="palette">
+            <h2>🎯 Boîte à Outils</h2>
+            
+            <h3>Objets de Base</h3>
+            
+            <div class="object-type scale-hover" draggable="true" data-type="rectangle">
+                <div class="object-icon">⬜</div>
+                <div>
+                    <strong>Rectangle</strong><br>
+                    <small>Forme rectangulaire</small>
+                </div>
+            </div>
+            
+            <div class="object-type scale-hover" draggable="true" data-type="circle">
+                <div class="object-icon">⭕</div>
+                <div>
+                    <strong>Cercle</strong><br>
+                    <small>Forme circulaire</small>
+                </div>
+            </div>
+            
+            <div class="object-type scale-hover" draggable="true" data-type="button">
+                <div class="object-icon">🔘</div>
+                <div>
+                    <strong>Bouton</strong><br>
+                    <small>Bouton interactif</small>
+                </div>
+            </div>
+            
+            <div class="object-type scale-hover" draggable="true" data-type="text">
+                <div class="object-icon">📝</div>
+                <div>
+                    <strong>Texte</strong><br>
+                    <small>Affichage texte</small>
+                </div>
+            </div>
+            
+            <div class="object-type scale-hover" draggable="true" data-type="led">
+                <div class="object-icon">💡</div>
+                <div>
+                    <strong>LED</strong><br>
+                    <small>Indicateur lumineux</small>
+                </div>
+            </div>
+
+            <!-- Section Icônes intégrée -->
+            <div class="icon-palette">
+                <div class="icon-palette-header">
+                    <h3>🎨 Icônes & Images</h3>
+                    <div class="palette-controls">
+                        <span id="icons-count-badge" style="background: rgba(42,82,152,0.1); color: #2a5298; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">0 icône(s)</span>
+                        <a href="/graphics/icons/management" class="icon-library-btn" target="_blank">
+                            📚 Gérer Icônes
+                        </a>
+                    </div>
+                </div>
+
+                <div class="available-icons-section">
+                    <div class="section-title">
+                        <span>🏭 Icônes Industrielles</span>
+                        <button class="btn btn-small btn-outline" onclick="loadIndustrialIcons()" title="Actualiser">🔄</button>
+                    </div>
+                    <div class="icon-grid-palette" id="industrial-icons-grid">
+                        <div class="empty-icon-state">
+                            <div class="icon">⏳</div>
+                            <div>Chargement des icônes...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="available-icons-section">
+                    <div class="section-title">
+                        <span>🎨 Icônes Personnalisées</span>
+                        <button class="btn btn-small btn-outline" onclick="loadCustomIcons()" title="Actualiser">🔄</button>
+                    </div>
+                    <div class="icon-grid-palette" id="custom-icons-grid">
+                        <div class="empty-icon-state">
+                            <div class="icon">📁</div>
+                            <div>Aucune icône personnalisée</div>
+                            <div style="font-size: 0.9em; margin-top: 10px;">
+                                <a href="/graphics/icons/management" target="_blank" style="color: #2a5298;">Ajouter des images</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="available-icons-section">
+                    <div class="section-title">
+                        <span>🔗 Icônes Externes</span>
+                        <button class="btn btn-small btn-outline" onclick="loadExternalIcons()" title="Actualiser">🔄</button>
+                    </div>
+                    <div class="icon-grid-palette" id="external-icons-grid">
+                        <div class="empty-icon-state">
+                            <div class="icon">🌐</div>
+                            <div>Feather Icons, FontAwesome...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>📋 Gestion Pages</h3>
+            <div class="property-group">
+                <label>Pages disponibles:</label>
+                <select id="page-selector" onchange="loadSelectedPage()">
+                    <option value="">-- Nouvelle page --</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-primary btn-small" onclick="createNewPage()">
+                ➕ Nouvelle Page
+            </button>
+        </div>
+
+        <!-- Zone de design avec barres de défilement -->
+        <div class="canvas-container">
+            <div class="canvas-header">
+                <div class="canvas-header-left">
+                    <span>Page: {{ page.nom_page if page.nom_page else 'Nouvelle Page' }}</span>
+                    
+                    <!-- Contrôles de taille -->
+                    <div class="canvas-size-controls">
+                        <label>Taille:</label>
+                        <input type="number" id="canvas-width" value="{{ page.largeur_page if page.largeur_page else 1920 }}" 
+                               onchange="updateCanvasSize()" min="800" max="4000">
+                        <span>×</span>
+                        <input type="number" id="canvas-height" value="{{ page.hauteur_page if page.hauteur_page else 1080 }}" 
+                               onchange="updateCanvasSize()" min="600" max="3000">
+                        <button class="btn btn-small btn-primary" onclick="applyStandardSizes()">📐 Standards</button>
+                    </div>
+                </div>
+                <span id="current-canvas-size">{{ page.largeur_page if page.largeur_page else 1920 }}×{{ page.hauteur_page if page.hauteur_page else 1080 }}px</span>
+            </div>
+            
+            <!-- Zone avec barres de défilement -->
+            <div class="canvas-scroll-area">
+                <div class="canvas" id="design-canvas" 
+                     data-page-id="{{ page.id_page if page.id_page else '' }}"
+                     data-page-width="{{ page.largeur_page if page.largeur_page else 1920 }}"
+                     data-page-height="{{ page.hauteur_page if page.hauteur_page else 1080 }}">
+                    <!-- Objets graphiques chargés ici -->
+                </div>
+            </div>
+            
+            <div class="object-counter">
+                Objets: <span id="object-count">0</span>
+            </div>
+        </div>
+
+        <!-- Propriétés -->
+        <div class="properties">
+            <h2>⚙️ Propriétés</h2>
+            
+            <div id="no-selection" class="property-group">
+                <div class="no-selection-message">
+                    <strong>Aucun objet sélectionné</strong><br>
+                    Cliquez sur un objet du canvas ou glissez-déposez depuis la boîte à outils
+                </div>
+            </div>
+
+            <div id="object-properties" style="display: none;" class="fade-in">
+                <!-- Propriétés générales -->
+                <h3>📋 Général</h3>
+                
+                <div class="property-group">
+                    <label>Nom de l'objet:</label>
+                    <input type="text" id="prop-name" placeholder="Nom de l'objet" onchange="updateObjectProperty('nom')">
+                </div>
+
+                <div class="property-group">
+                    <label>Type d'objet:</label>
+                    <select id="prop-type" disabled>
+                        <option value="rectangle">Rectangle</option>
+                        <option value="circle">Cercle</option>
+                        <option value="button">Bouton</option>
+                        <option value="text">Texte</option>
+                        <option value="led">LED</option>
+                        <option value="icon">Icône</option>
+                    </select>
+                </div>
+
+                <!-- Position et taille -->
+                <h3>📐 Position & Taille</h3>
+                
+                <div class="property-group">
+                    <label>Position (X, Y):</label>
+                    <div class="coordinates">
+                        <input type="number" id="prop-x" placeholder="X" onchange="updateObjectProperty('x')">
+                        <input type="number" id="prop-y" placeholder="Y" onchange="updateObjectProperty('y')">
+                    </div>
+                </div>
+
+                <div class="property-group">
+                    <label>Taille (L × H):</label>
+                    <div class="coordinates">
+                        <input type="number" id="prop-width" placeholder="Largeur" onchange="updateObjectProperty('width')">
+                        <input type="number" id="prop-height" placeholder="Hauteur" onchange="updateObjectProperty('height')">
+                    </div>
+                </div>
+
+                <!-- Apparence MODIFIÉE - UNE SEULE COULEUR -->
+                <h3>🎨 Apparence</h3>
+                
+                <div class="property-group">
+                    <label>Couleur de base:</label>
+                    <input type="color" id="prop-color-normal" onchange="updateObjectProperty('couleur_normale')">
+                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 5px;">
+                        Les couleurs dynamiques sont gérées par les règles ci-dessous
+                    </small>
+                </div>
+
+                <!-- NOUVEAU : Panel règles de couleur -->
+                <div class="color-rules-panel" id="color-rules-panel">
+                    <h4>🎨 Règles de Couleur Dynamique</h4>
+                    
+                    <!-- Formulaire création règle -->
+                    <div class="rule-form">
+                        <h5>➕ Nouvelle Règle</h5>
+                        
+                        <div class="form-row">
+                            <label>Nom de la règle:</label>
+                            <input type="text" id="rule-name" placeholder="Ex: LED rouge si température > 50">
+                        </div>
+
+                        <div class="form-row">
+                            <label>Tag à surveiller:</label>
+                            <select id="rule-tag">
+                                <option value="">-- Sélectionner --</option>
+                                {% for tag in tags_disponibles %}
+                                <option value="{{ tag.nom_tag }}">{{ tag.nom_tag }} ({{ tag.adresse_tag }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <label>Condition:</label>
+                            <div class="condition-group">
+                                <select id="rule-operator">
+                                    <option value="=">=== (égal)</option>
+                                    <option value="!=">!== (différent)</option>
+                                    <option value=">">> (supérieur)</option>
+                                    <option value="<">< (inférieur)</option>
+                                    <option value=">=">>= (supérieur ou égal)</option>
+                                    <option value="<=">>= (inférieur ou égal)</option>
+                                </select>
+                                <input type="text" id="rule-value" placeholder="Valeur" style="flex: 1; margin-left: 5px;">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label>Couleur à appliquer:</label>
+                            <div class="color-row">
+                                <input type="color" id="rule-color" value="#ff0000">
+                                <div class="color-preview" id="color-preview">Aperçu</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label>Priorité (1 = plus haute):</label>
+                            <input type="number" id="rule-priority" min="1" max="99" value="1">
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="btn btn-success btn-small" onclick="createColorRule()">
+                                💾 Créer
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="clearRuleForm()">
+                                🗑️ Effacer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Liste des règles existantes -->
+                    <div class="rules-list">
+                        <div class="rules-header">
+                            <h5>📋 Règles Existantes (<span id="rules-count">0</span>)</h5>
+                            <div class="rules-actions">
+                                <button class="btn btn-small btn-outline" onclick="loadObjectRules()" title="Actualiser">
+                                    🔄
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="deleteAllRules()" title="Tout supprimer">
+                                    🗑️ Tout
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="rules-container">
+                            <div class="no-rules">Aucune règle définie</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Texte -->
+                <div class="property-group" id="text-properties">
+                    <label>Texte affiché:</label>
+                    <textarea id="prop-text" rows="2" placeholder="Texte à afficher" onchange="updateObjectProperty('texte')"></textarea>
+                </div>
+
+                <!-- Propriétés spécifiques aux icônes -->
+                <div class="icon-properties-panel" id="icon-properties" style="display: none;">
+                    <h4>🖼️ Propriétés Icône</h4>
+                    
+                    <div class="icon-property-group">
+                        <label>Icône actuelle:</label>
+                        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px;">
+                            <div id="prop-icon-preview" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2); border-radius: 4px; font-size: 1.5em;">
+                                📷
+                            </div>
+                            <div style="flex: 1;">
+                                <div id="prop-icon-name" style="font-weight: bold;">Aucune icône</div>
+                                <div id="prop-icon-type" style="font-size: 0.8em; opacity: 0.8;">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="icon-transform-controls">
+                        <div class="transform-control">
+                            <label>Taille</label>
+                            <input type="range" id="prop-icon-size" class="transform-slider" min="0.1" max="3" step="0.1" value="1" onchange="updateObjectProperty('icon_size')">
+                            <span class="transform-value" id="icon-size-value">100%</span>
+                        </div>
+                        <div class="transform-control">
+                            <label>Rotation</label>
+                            <input type="range" id="prop-icon-rotation" class="transform-slider" min="0" max="360" step="15" value="0" onchange="updateObjectProperty('icon_rotation')">
+                            <span class="transform-value" id="icon-rotation-value">0°</span>
+                        </div>
+                    </div>
+
+                    <div class="icon-property-group">
+                        <label>
+                            <input type="checkbox" id="prop-icon-keep-aspect" checked onchange="updateObjectProperty('icon_keep_aspect')">
+                            Conserver les proportions
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Liaison avec tag automate -->
+                <div class="tag-link" id="tag-link">
+                    <h4>🏷 Liaison Tag Automate</h4>
+                    
+                    <div class="property-group">
+                        <label>Tag lié:</label>
+                        <select id="prop-tag" onchange="updateObjectProperty('tag_lie')">
+                            <option value="">-- Aucun tag --</option>
+                            {% for tag in tags_disponibles %}
+                            <option value="{{ tag.nom_tag }}">{{ tag.nom_tag }} ({{ tag.adresse_tag }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="property-group">
+                        <label>Action au clic:</label>
+                        <select id="prop-action" onchange="updateObjectProperty('action_clic')">
+                            <option value="read">Lecture seule</option>
+                            <option value="write">Écriture</option>
+                            <option value="toggle">Basculer (BOOL)</option>
+                        </select>
+                    </div>
+
+                    <div class="property-group" id="write-value-group" style="display: none;">
+                        <label>Valeur à écrire:</label>
+                        <input type="text" id="prop-write-value" placeholder="Valeur" onchange="updateObjectProperty('valeur_ecriture')">
+                    </div>
+                </div>
+
+                <!-- Section navigation séparée -->
+                <div class="navigation-link" id="navigation-link">
+                    <h4>🧭 Liaison Navigation</h4>
+                    
+                    <div class="property-group">
+                        <label>
+                            <input type="checkbox" id="navigation-enabled" onchange="toggleNavigation()">
+                            Activer la navigation au clic
+                        </label>
+                    </div>
+
+                    <div class="property-group" id="navigation-page-group" style="display: none;">
+                        <label>Page de destination:</label>
+                        <select id="prop-navigation-page" onchange="updateObjectProperty('page_destination')">
+                            <option value="">-- Sélectionner une page --</option>
+                        </select>
+                        <div id="navigation-page-info" style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            Aucune page sélectionnée
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <h3>🔧 Actions</h3>
+                <div class="property-group">
+                    <button class="btn btn-success btn-small" onclick="applyProperties()">
+                        ✅ Appliquer
+                    </button>
+                    <button class="btn btn-danger btn-small" onclick="deleteSelectedObject()">
+                        🗑️ Supprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let selectedObject = null;
+        let currentPage = {{ page.id_page if page.id_page is not none else 'null' }};
+        let objects = [];
+        let draggedType = null;
+        let draggedIcon = null;
+        let availablePages = [];
+        let hasUnsavedChanges = false;
+        let availableIcons = [];
+        let iconsByCategory = {};
+        let currentObjectColorRules = []; // NOUVEAU : pour les règles de couleur
+
+        // Variables pour les règles de couleur
+        let tags_disponibles = [
+            {% for tag in tags_disponibles %}
+            {nom_tag: "{{ tag.nom_tag }}", adresse_tag: "{{ tag.adresse_tag }}"},
+            {% endfor %}
+        ];
+
+        // Utilitaires pour couleurs
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎨 Éditeur graphique IHM initialisé');
+            
+            setupEventListeners();
+            loadExistingObjects();
+            loadAvailablePages();
+            loadAllIcons();
+            updateObjectCounter();
+            initializeSaveButton();
+            updateCanvasSize();
+            injectNavigationStyles();
+            initializeColorRules(); // NOUVEAU
+            
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+
+            console.log('✅ Système complet initialisé');
+        });
+
+        // NOUVEAU : Initialisation des règles de couleur
+        function initializeColorRules() {
+            const colorInput = document.getElementById('rule-color');
+            const colorPreview = document.getElementById('color-preview');
+            
+            function updateColorPreview() {
+                const color = colorInput.value;
+                colorPreview.style.backgroundColor = color;
+                colorPreview.style.setProperty('--preview-color', color);
+                
+                // Ajuster la couleur du texte pour le contraste
+                const rgb = hexToRgb(color);
+                const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+                colorPreview.style.color = brightness > 128 ? '#000' : '#fff';
+            }
+            
+            if (colorInput && colorPreview) {
+                colorInput.addEventListener('input', updateColorPreview);
+                updateColorPreview();
+            }
+        }
+
+        // Gestion des événements
+        function setupEventListeners() {
+            const canvas = document.getElementById('design-canvas');
+            setupDragAndDrop();
+            
+            if (canvas) {
+                canvas.addEventListener('click', function(e) {
+                    if (e.target === canvas) {
+                        deselectObject();
+                    }
+                });
+            }
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Delete' && selectedObject) {
+                    e.preventDefault();
+                    deleteSelectedObject();
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    deselectObject();
+                }
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    savePage();
+                }
+                if (e.ctrlKey && e.key === 'i') {
+                    e.preventDefault();
+                    loadAllIcons();
+                }
+            });
+        }
+
+        // Drag and Drop
+        function setupDragAndDrop() {
+            const objectTypes = document.querySelectorAll('.object-type');
+            const canvas = document.getElementById('design-canvas');
+
+            objectTypes.forEach(type => {
+                type.addEventListener('dragstart', function(e) {
+                    draggedType = this.dataset.type;
+                    this.classList.add('dragging');
+                });
+
+                type.addEventListener('dragend', function() {
+                    this.classList.remove('dragging');
+                    draggedType = null;
+                });
+            });
+
+            if (canvas) {
+                canvas.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    if (draggedType || draggedIcon) {
+                        canvas.classList.add('icon-drop-zone');
+                    }
+                });
+
+                canvas.addEventListener('dragleave', function(e) {
+                    canvas.classList.remove('icon-drop-zone');
+                });
+
+                canvas.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    canvas.classList.remove('icon-drop-zone');
+                    
+                    const scrollArea = document.querySelector('.canvas-scroll-area');
+                    const canvasRect = canvas.getBoundingClientRect();
+                    
+                    const x = e.clientX - canvasRect.left + scrollArea.scrollLeft;
+                    const y = e.clientY - canvasRect.top + scrollArea.scrollTop;
+                    
+                    if (draggedIcon) {
+                        createIconObject(draggedIcon, x, y);
+                    } else if (draggedType) {
+                        createObject(draggedType, x, y);
+                    }
+                });
+            }
+        }
+
+        // Chargement des icônes
+        async function loadAllIcons() {
+            try {
+                const response = await fetch('/api/graphics/icons');
+                const result = await response.json();
+
+                if (result.success) {
+                    availableIcons = result.icons;
+                    
+                    iconsByCategory = {
+                        industrial: availableIcons.filter(icon => icon.type_source === 'industrial'),
+                        custom: availableIcons.filter(icon => icon.type_source === 'upload'),
+                        external: availableIcons.filter(icon => icon.type_source === 'external')
+                    };
+
+                    renderIndustrialIcons();
+                    renderCustomIcons();
+                    renderExternalIcons();
+                    updateIconsCountBadge();
+                } else {
+                    showErrorMessage('Erreur chargement icônes: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur de connexion lors du chargement des icônes');
+            }
+        }
+
+        function renderIndustrialIcons() {
+            const grid = document.getElementById('industrial-icons-grid');
+            const icons = iconsByCategory.industrial || [];
+
+            if (icons.length === 0) {
+                grid.innerHTML = `<div class="empty-icon-state"><div class="icon">🏭</div><div>Aucune icône industrielle</div></div>`;
+                return;
+            }
+
+            grid.innerHTML = icons.map(icon => createPaletteIconHTML(icon)).join('');
+            setupIconDragAndDrop(grid);
+        }
+
+        function renderCustomIcons() {
+            const grid = document.getElementById('custom-icons-grid');
+            const icons = iconsByCategory.custom || [];
+
+            if (icons.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-icon-state">
+                        <div class="icon">📁</div>
+                        <div>Aucune icône personnalisée</div>
+                        <div style="font-size: 0.9em; margin-top: 10px;">
+                            <a href="/graphics/icons/management" target="_blank" style="color: #2a5298;">Ajouter des images</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = icons.map(icon => createPaletteIconHTML(icon)).join('');
+            setupIconDragAndDrop(grid);
+        }
+
+        function renderExternalIcons() {
+            const grid = document.getElementById('external-icons-grid');
+            const icons = iconsByCategory.external || [];
+
+            if (icons.length === 0) {
+                grid.innerHTML = `<div class="empty-icon-state"><div class="icon">🌐</div><div>Feather Icons, FontAwesome...</div></div>`;
+                return;
+            }
+
+            grid.innerHTML = icons.map(icon => createPaletteIconHTML(icon)).join('');
+            setupIconDragAndDrop(grid);
+        }
+
+        function createPaletteIconHTML(icon) {
+            let previewHTML = '';
+
+            if (icon.type_source === 'industrial' || icon.is_unicode) {
+                previewHTML = `<span class="unicode-icon">${icon.unicode_char || '🔧'}</span>`;
+            } else if (icon.type_source === 'external') {
+                if (icon.external_library === 'feather') {
+                    previewHTML = `<i data-feather="${icon.external_name}"></i>`;
+                } else if (icon.external_library === 'fontawesome') {
+                    previewHTML = `<i class="${icon.external_name}"></i>`;
+                }
+            } else if (icon.type_source === 'upload') {
+                const imageUrl = icon.url || `/static/icons/custom/${icon.fichier_original || 'default.png'}`;
+                previewHTML = `<img src="${imageUrl}" alt="${icon.nom_icon}" style="max-width: 40px; max-height: 40px; object-fit: contain;" onerror="this.style.display='none'; this.parentNode.innerHTML='📷';">`;
+            }
+
+            return `
+                <div class="palette-icon-item" 
+                    draggable="true" 
+                    data-icon-id="${icon.id_icon || icon.id}"
+                    data-tooltip="${icon.nom_icon}"
+                    title="${icon.nom_icon}">
+                    ${previewHTML}
+                </div>
+            `;
+        }
+
+        function setupIconDragAndDrop(container) {
+            const iconItems = container.querySelectorAll('.palette-icon-item');
+            
+            iconItems.forEach(item => {
+                item.addEventListener('dragstart', function(e) {
+                    const iconId = this.dataset.iconId;
+                    draggedIcon = availableIcons.find(icon => (icon.id_icon || icon.id) == iconId);
+                    this.classList.add('dragging');
+                });
+
+                item.addEventListener('dragend', function() {
+                    this.classList.remove('dragging');
+                    draggedIcon = null;
+                });
+            });
+        }
+
+        function updateIconsCountBadge() {
+            const badge = document.getElementById('icons-count-badge');
+            if (badge) {
+                badge.textContent = `${availableIcons.length} icône(s)`;
+            }
+        }
+
+        // Fonctions de rechargement
+        async function loadIndustrialIcons() { await loadAllIcons(); }
+        async function loadCustomIcons() { await loadAllIcons(); }
+        async function loadExternalIcons() { await loadAllIcons(); }
+
+        // Création d'objets
+        async function createObject(type, x, y) {
+            if (!currentPage) {
+                showErrorMessage('Aucune page sélectionnée. Créez d\'abord une page.');
+                return;
+            }
+
+            const objectData = {
+                type_objet: type,
+                x: Math.round(Math.max(0, x)),
+                y: Math.round(Math.max(0, y)),
+                width: getDefaultSize(type).width,
+                height: getDefaultSize(type).height,
+                couleur_normale: getDefaultColor(type),
+                // SUPPRIMÉ : couleur_active: getDefaultActiveColor(type),
+                texte: getDefaultText(type),
+                page_id: currentPage,
+                nom: `${type}_${Date.now()}`
+            };
+
+            try {
+                const response = await fetch('/api/graphics/animations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(objectData)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    const newObject = result.animation;
+                    objects.push(newObject);
+                    renderObject(newObject);
+                    updateObjectCounter();
+                    selectObject(newObject.id);
+                    markAsChanged();
+                    showSuccessMessage('Objet créé avec succès');
+                } else {
+                    showErrorMessage('Erreur création objet: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur création objet: ' + error.message);
+            }
+        }
+
+        async function createIconObject(icon, x, y) {
+            if (!currentPage) {
+                showErrorMessage('Aucune page sélectionnée.');
+                return;
+            }
+
+            const iconDataForStorage = {
+                id_icon: icon.id_icon || icon.id,
+                nom_icon: icon.nom_icon,
+                description_icon: icon.description_icon || '',
+                categorie: icon.categorie || 'custom',
+                type_source: icon.type_source,
+                external_name: icon.external_name,
+                external_library: icon.external_library,
+                fichier_path: icon.fichier_path,
+                fichier_original: icon.fichier_original,
+                unicode_char: icon.unicode_char,
+                is_unicode: icon.is_unicode,
+                url: icon.url,
+                largeur_defaut: icon.largeur_defaut,
+                hauteur_defaut: icon.hauteur_defaut,
+                couleur_defaut: icon.couleur_defaut
+            };
+
+            const objectData = {
+                type_objet: 'icon',
+                x: Math.round(Math.max(0, x)),
+                y: Math.round(Math.max(0, y)),
+                width: icon.largeur_defaut || 64,
+                height: icon.hauteur_defaut || 64,
+                couleur_normale: icon.couleur_defaut || '#2a5298',
+                // SUPPRIMÉ : couleur_active: '#1e3c72',
+                texte: '',
+                page_id: currentPage,
+                nom: `${icon.nom_icon}_${Date.now()}`,
+                icon_data: JSON.stringify(iconDataForStorage),
+                icon_source: icon.type_source,
+                icon_size: 1.0,
+                icon_rotation: 0,
+                icon_keep_aspect: true
+            };
+
+            try {
+                const response = await fetch('/api/graphics/animations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(objectData)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    const newObject = result.animation;
+                    
+                    if (newObject.regles && typeof newObject.regles === 'string') {
+                        try {
+                            newObject.regles = JSON.parse(newObject.regles);
+                        } catch (e) {
+                            newObject.regles = {};
+                        }
+                    }
+                    
+                    objects.push(newObject);
+                    renderObject(newObject);
+                    updateObjectCounter();
+                    selectObject(newObject.id);
+                    markAsChanged();
+                    showSuccessMessage(`Icône "${icon.nom_icon}" ajoutée avec succès`);
+                } else {
+                    showErrorMessage('Erreur création icône: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur création icône: ' + error.message);
+            }
+        }
+
+        // Tailles par défaut
+        function getDefaultSize(type) {
+            const sizes = {
+                rectangle: {width: 100, height: 60},
+                circle: {width: 80, height: 80},
+                button: {width: 120, height: 40},
+                text: {width: 100, height: 30},
+                led: {width: 30, height: 30},
+                icon: {width: 64, height: 64}
+            };
+            return sizes[type] || {width: 100, height: 60};
+        }
+
+        function getDefaultColor(type) {
+            const colors = {
+                rectangle: '#CCCCCC',
+                circle: '#CCCCCC', 
+                button: '#2a5298',
+                text: 'transparent',
+                led: '#dc3545',
+                icon: '#2a5298'
+            };
+            return colors[type] || '#CCCCCC';
+        }
+
+        function getDefaultText(type) {
+            const texts = {
+                button: 'Bouton',
+                text: 'Texte',
+                icon: ''
+            };
+            return texts[type] || '';
+        }
+
+        // Rendu des objets
+        function renderObject(obj) {
+            const canvas = document.getElementById('design-canvas');
+            if (!canvas) return;
+            
+            const element = document.createElement('div');
+            
+            element.id = `object-${obj.id}`;
+            element.className = `design-object ${obj.type}`;
+            element.style.cssText = `
+                left: ${obj.x}px;
+                top: ${obj.y}px;
+                width: ${obj.width}px;
+                height: ${obj.height}px;
+                --object-color: ${obj.couleur_normale};
+            `;
+
+            if (obj.type === 'icon') {
+                renderIconObject(element, obj);
+            } else if (obj.texte) {
+                element.textContent = obj.texte;
+            }
+
+            element.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectObject(obj.id);
+            });
+
+            element.addEventListener('mousedown', function(e) {
+                startDrag(e, obj.id);
+            });
+
+            canvas.appendChild(element);
+            element.classList.add('fade-in');
+        }
+
+        function renderIconObject(element, obj) {
+            try {
+                let iconData = null;
+                
+                if (obj.regles && obj.regles.icon_data) {
+                    iconData = obj.regles.icon_data;
+                } else if (obj.icon_data) {
+                    iconData = obj.icon_data;
+                }
+
+                if (typeof iconData === 'string') {
+                    try {
+                        iconData = JSON.parse(iconData);
+                    } catch (e) {
+                        iconData = null;
+                    }
+                }
+
+                if (!iconData) {
+                    element.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545;">⚠️</div>`;
+                    return;
+                }
+
+                const iconSize = (obj.regles && obj.regles.icon_size) || obj.icon_size || 1.0;
+                const rotation = (obj.regles && obj.regles.icon_rotation) || obj.icon_rotation || 0;
+                const color = obj.couleur_normale || '#2a5298';
+
+                let iconHTML = '';
+                
+                if (iconData.type_source === 'industrial' || iconData.is_unicode) {
+                    const unicodeChar = iconData.unicode_char || '🔧';
+                    iconHTML = `<span class="unicode-icon" style="font-size: ${2 * iconSize}em; color: ${color};">${unicodeChar}</span>`;
+                } else if (iconData.type_source === 'external') {
+                    if (iconData.external_library === 'feather') {
+                        iconHTML = `<i data-feather="${iconData.external_name}" style="width: ${24 * iconSize}px; height: ${24 * iconSize}px; color: ${color};"></i>`;
+                    } else if (iconData.external_library === 'fontawesome') {
+                        iconHTML = `<i class="${iconData.external_name}" style="font-size: ${2 * iconSize}em; color: ${color};"></i>`;
+                    }
+                } else if (iconData.type_source === 'upload') {
+                    let imageUrl = iconData.url;
+                    if (!imageUrl && iconData.fichier_original) {
+                        imageUrl = `/static/icons/custom/${iconData.fichier_original}`;
+                    }
+                    
+                    if (imageUrl) {
+                        const maxWidth = obj.width * 0.9 * iconSize;
+                        const maxHeight = obj.height * 0.9 * iconSize;
+                        iconHTML = `<img src="${imageUrl}" alt="${iconData.nom_icon || 'Icône'}" style="max-width: ${maxWidth}px; max-height: ${maxHeight}px; object-fit: contain; display: block; margin: auto;" onerror="this.style.display='none'; this.parentNode.innerHTML='📷';">`;
+                    }
+                }
+
+                element.innerHTML = iconHTML;
+                
+                if (rotation !== 0) {
+                    element.style.transform = `rotate(${rotation}deg)`;
+                }
+
+                if (iconData.type_source === 'external' && iconData.external_library === 'feather' && typeof feather !== 'undefined') {
+                    setTimeout(() => feather.replace(), 100);
+                }
+
+            } catch (error) {
+                element.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545;">⚠️</div>`;
+            }
+        }
+
+        // Sélection d'objets
+        function selectObject(objectId) {
+            deselectObject();
+            
+            const element = document.getElementById(`object-${objectId}`);
+            if (element) {
+                element.classList.add('selected');
+                selectedObject = objects.find(obj => obj.id === objectId);
+                updatePropertiesPanel();
+            }
+        }
+
+        function deselectObject() {
+            if (selectedObject) {
+                const element = document.getElementById(`object-${selectedObject.id}`);
+                if (element) {
+                    element.classList.remove('selected');
+                }
+                selectedObject = null;
+                hidePropertiesPanel();
+            }
+        }
+
+        // Panneau des propriétés MODIFIÉ
+        function updatePropertiesPanel() {
+            if (!selectedObject) return;
+            
+            document.getElementById('no-selection').style.display = 'none';
+            const propertiesPanel = document.getElementById('object-properties');
+            propertiesPanel.style.display = 'block';
+            
+            // Remplir les champs
+            document.getElementById('prop-name').value = selectedObject.nom || '';
+            document.getElementById('prop-type').value = selectedObject.type || '';
+            document.getElementById('prop-x').value = selectedObject.x || 0;
+            document.getElementById('prop-y').value = selectedObject.y || 0;
+            document.getElementById('prop-width').value = selectedObject.width || 100;
+            document.getElementById('prop-height').value = selectedObject.height || 60;
+            document.getElementById('prop-color-normal').value = selectedObject.couleur_normale || '#CCCCCC';
+            // SUPPRIMÉ : document.getElementById('prop-color-active').value = selectedObject.couleur_active || '#28a745';
+            document.getElementById('prop-text').value = selectedObject.texte || '';
+            
+            const tagValue = selectedObject.tag_lie || '';
+            const actionValue = selectedObject.action_clic || 'read';
+            
+            document.getElementById('prop-tag').value = tagValue;
+            document.getElementById('prop-action').value = actionValue;
+            document.getElementById('prop-write-value').value = selectedObject.valeur_ecriture || '';
+            
+            // Navigation
+            let navigationEnabled = false;
+            let navigationPage = '';
+            
+            if (selectedObject.action_clic === 'navigate' || selectedObject.page_destination) {
+                navigationEnabled = true;
+                navigationPage = selectedObject.page_destination || '';
+            }
+            
+            document.getElementById('navigation-enabled').checked = navigationEnabled;
+            document.getElementById('prop-navigation-page').value = navigationPage;
+            updateNavigationPageInfo(navigationPage);
+            
+            updatePropertyGroupsVisibility();
+            
+            if (selectedObject.type === 'icon') {
+                updateIconProperties();
+            }
+            
+            // NOUVEAU : Charger les règles de couleur
+            updateColorRulesPanel();
+            loadObjectRules();
+        }
+
+        function hidePropertiesPanel() {
+            document.getElementById('no-selection').style.display = 'block';
+            document.getElementById('object-properties').style.display = 'none';
+            document.getElementById('icon-properties').style.display = 'none';
+            document.getElementById('color-rules-panel').style.display = 'none'; // NOUVEAU
+        }
+
+        // NOUVEAU : Gestion du panel des règles de couleur
+        function updateColorRulesPanel() {
+            const panel = document.getElementById('color-rules-panel');
+            
+            if (!selectedObject) {
+                panel.style.display = 'none';
+                return;
+            }
+            
+            // Afficher pour les objets visuels
+            const supportedTypes = ['rectangle', 'circle', 'button', 'led', 'text', 'icon'];
+            if (supportedTypes.includes(selectedObject.type)) {
+                panel.style.display = 'block';
+                populateTagsSelect();
+                
+                // Pré-remplir le tag si l'objet en a un
+                if (selectedObject.tag_lie) {
+                    document.getElementById('rule-tag').value = selectedObject.tag_lie;
+                }
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        // NOUVEAU : Remplir le select des tags
+        function populateTagsSelect() {
+            const select = document.getElementById('rule-tag');
+            select.innerHTML = '<option value="">-- Sélectionner --</option>';
+            
+            tags_disponibles.forEach(tag => {
+                const option = document.createElement('option');
+                option.value = tag.nom_tag;
+                option.textContent = `${tag.nom_tag} (${tag.adresse_tag})`;
+                select.appendChild(option);
+            });
+        }
+
+        function updatePropertyGroupsVisibility() {
+            const type = document.getElementById('prop-type').value;
+            const action = document.getElementById('prop-action').value;
+            const navigationEnabled = document.getElementById('navigation-enabled').checked;
+            
+            document.getElementById('text-properties').style.display = ['text', 'button'].includes(type) ? 'block' : 'none';
+            document.getElementById('write-value-group').style.display = action === 'write' ? 'block' : 'none';
+            document.getElementById('navigation-page-group').style.display = navigationEnabled ? 'block' : 'none';
+            document.getElementById('icon-properties').style.display = type === 'icon' ? 'block' : 'none';
+        }
+
+        function updateIconProperties() {
+            const iconProps = document.getElementById('icon-properties');
+            iconProps.style.display = 'block';
+            
+            const regles = selectedObject.regles || {};
+            
+            document.getElementById('prop-icon-size').value = regles.icon_size || 1.0;
+            document.getElementById('prop-icon-rotation').value = regles.icon_rotation || 0;
+            document.getElementById('prop-icon-keep-aspect').checked = regles.icon_keep_aspect !== false;
+            
+            updateIconPreview();
+            updateIconSizeDisplay();
+            updateIconRotationDisplay();
+        }
+
+        function updateIconPreview() {
+            const preview = document.getElementById('prop-icon-preview');
+            const nameEl = document.getElementById('prop-icon-name');
+            const typeEl = document.getElementById('prop-icon-type');
+            
+            try {
+                const regles = selectedObject.regles || {};
+                let iconData = regles.icon_data;
+                
+                if (typeof iconData === 'string') {
+                    iconData = JSON.parse(iconData);
+                }
+
+                if (!iconData) {
+                    preview.innerHTML = '📷';
+                    nameEl.textContent = 'Aucune icône';
+                    typeEl.textContent = '-';
+                    return;
+                }
+
+                let previewHTML = '';
+                
+                if (iconData.type_source === 'industrial' || iconData.is_unicode) {
+                    previewHTML = `<span style="font-size: 2em;">${iconData.unicode_char || '🔧'}</span>`;
+                } else if (iconData.type_source === 'external') {
+                    if (iconData.external_library === 'feather') {
+                        previewHTML = `<i data-feather="${iconData.external_name}" style="width: 24px; height: 24px;"></i>`;
+                    } else if (iconData.external_library === 'fontawesome') {
+                        previewHTML = `<i class="${iconData.external_name}" style="font-size: 2em;"></i>`;
+                    }
+                } else if (iconData.type_source === 'upload' && iconData.url) {
+                    previewHTML = `<img src="${iconData.url}" alt="${iconData.nom_icon}" style="max-width: 40px; max-height: 40px;">`;
+                }
+
+                preview.innerHTML = previewHTML;
+                nameEl.textContent = iconData.nom_icon || 'Icône sans nom';
+                typeEl.textContent = getTypeDisplayName(iconData.type_source);
+                
+                if (iconData.type_source === 'external' && iconData.external_library === 'feather' && typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+
+            } catch (error) {
+                preview.innerHTML = '⚠️';
+                nameEl.textContent = 'Erreur';
+                typeEl.textContent = 'Données corrompues';
+            }
+        }
+
+        function getTypeDisplayName(type) {
+            const types = {
+                'industrial': 'Industrielle',
+                'external': 'Externe',
+                'upload': 'Personnalisée'
+            };
+            return types[type] || type;
+        }
+
+        function updateIconSizeDisplay() {
+            const size = parseFloat(document.getElementById('prop-icon-size').value);
+            document.getElementById('icon-size-value').textContent = Math.round(size * 100) + '%';
+        }
+
+        function updateIconRotationDisplay() {
+            const rotation = parseInt(document.getElementById('prop-icon-rotation').value);
+            document.getElementById('icon-rotation-value').textContent = rotation + '°';
+        }
+
+        function toggleNavigation() {
+            const enabled = document.getElementById('navigation-enabled').checked;
+            
+            if (enabled && selectedObject) {
+                selectedObject.action_clic = 'navigate';
+            } else if (selectedObject) {
+                if (selectedObject.action_clic === 'navigate') {
+                    selectedObject.action_clic = 'read';
+                }
+                selectedObject.page_destination = '';
+                document.getElementById('prop-navigation-page').value = '';
+            }
+            
+            updatePropertyGroupsVisibility();
+            updateNavigationPageInfo(enabled ? selectedObject?.page_destination : '');
+            
+            if (selectedObject) {
+                saveObjectToServer(selectedObject);
+            }
+        }
+
+        function updateNavigationPageInfo(pageId) {
+            const infoElement = document.getElementById('navigation-page-info');
+            if (!infoElement) return;
+            
+            if (!pageId) {
+                infoElement.innerHTML = '<span style="color: #666;">Aucune page sélectionnée</span>';
+                return;
+            }
+            
+            const page = availablePages.find(p => p.id == pageId);
+            if (page) {
+                infoElement.innerHTML = `<div style="color: #2a5298; font-weight: 500;">📄 ${page.nom}<br>📐 ${page.largeur}×${page.hauteur}px</div>`;
+            } else {
+                infoElement.innerHTML = '<span style="color: #dc3545;">⚠️ Page introuvable</span>';
+            }
+        }
+
+        // Mise à jour des propriétés MODIFIÉE
+        async function updateObjectProperty(property) {
+            if (!selectedObject) return;
+            
+            const element = document.getElementById(`object-${selectedObject.id}`);
+            let value;
+            
+            switch(property) {
+                case 'nom':
+                    value = document.getElementById('prop-name').value;
+                    selectedObject.nom = value;
+                    break;
+                case 'x':
+                    value = parseInt(document.getElementById('prop-x').value) || 0;
+                    selectedObject.x = value;
+                    if (element) element.style.left = value + 'px';
+                    break;
+                case 'y':
+                    value = parseInt(document.getElementById('prop-y').value) || 0;
+                    selectedObject.y = value;
+                    if (element) element.style.top = value + 'px';
+                    break;
+                case 'width':
+                    value = parseInt(document.getElementById('prop-width').value) || 100;
+                    selectedObject.width = value;
+                    if (element) element.style.width = value + 'px';
+                    break;
+                case 'height':
+                    value = parseInt(document.getElementById('prop-height').value) || 60;
+                    selectedObject.height = value;
+                    if (element) element.style.height = value + 'px';
+                    break;
+                case 'couleur_normale':
+                    value = document.getElementById('prop-color-normal').value;
+                    selectedObject.couleur_normale = value;
+                    if (element) element.style.setProperty('--object-color', value);
+                    break;
+                // SUPPRIMÉ : case 'couleur_active'
+                case 'texte':
+                    value = document.getElementById('prop-text').value;
+                    selectedObject.texte = value;
+                    if (element && selectedObject.type !== 'icon') element.textContent = value;
+                    break;
+                case 'tag_lie':
+                    value = document.getElementById('prop-tag').value;
+                    selectedObject.tag_lie = value;
+                    updatePropertyGroupsVisibility();
+                    break;
+                case 'action_clic':
+                    value = document.getElementById('prop-action').value;
+                    selectedObject.action_clic = value;
+                    updatePropertyGroupsVisibility();
+                    break;
+                case 'valeur_ecriture':
+                    value = document.getElementById('prop-write-value').value;
+                    selectedObject.valeur_ecriture = value;
+                    break;
+                case 'page_destination':
+                    value = document.getElementById('prop-navigation-page').value;
+                    selectedObject.page_destination = value;
+                    if (!selectedObject.regles) selectedObject.regles = {};
+                    selectedObject.regles.page_destination = value;
+                    updateNavigationPageInfo(value);
+                    break;
+                case 'icon_size':
+                    value = parseFloat(document.getElementById('prop-icon-size').value);
+                    if (!selectedObject.regles) selectedObject.regles = {};
+                    selectedObject.regles.icon_size = value;
+                    updateIconSizeDisplay();
+                    if (element) renderIconObject(element, selectedObject);
+                    break;
+                case 'icon_rotation':
+                    value = parseInt(document.getElementById('prop-icon-rotation').value) || 0;
+                    if (!selectedObject.regles) selectedObject.regles = {};
+                    selectedObject.regles.icon_rotation = value;
+                    updateIconRotationDisplay();
+                    if (element) renderIconObject(element, selectedObject);
+                    break;
+                case 'icon_keep_aspect':
+                    value = document.getElementById('prop-icon-keep-aspect').checked;
+                    if (!selectedObject.regles) selectedObject.regles = {};
+                    selectedObject.regles.icon_keep_aspect = value;
+                    break;
+            }
+            
+            markAsChanged();
+            if (element) {
+                element.classList.add('success-flash');
+                setTimeout(() => element.classList.remove('success-flash'), 500);
+            }
+            
+            await saveObjectToServer(selectedObject);
+        }
+
+        // NOUVEAU : Fonctions de gestion des règles de couleur
+        async function createColorRule() {
+            if (!selectedObject) {
+                showErrorMessage('Aucun objet sélectionné');
+                return;
+            }
+            
+            const ruleName = document.getElementById('rule-name').value.trim();
+            const tagName = document.getElementById('rule-tag').value;
+            const operator = document.getElementById('rule-operator').value;
+            const targetValue = document.getElementById('rule-value').value.trim();
+            const color = document.getElementById('rule-color').value;
+            const priority = parseInt(document.getElementById('rule-priority').value) || 1;
+            
+            // Validations
+            if (!ruleName) {
+                showErrorMessage('Nom de règle obligatoire');
+                return;
+            }
+            
+            if (!tagName) {
+                showErrorMessage('Tag obligatoire');
+                return;
+            }
+            
+            if (!targetValue) {
+                showErrorMessage('Valeur obligatoire');
+                return;
+            }
+            
+            const ruleData = {
+                nom_regle: ruleName,
+                object_id: selectedObject.id,
+                tag_name: tagName,
+                operator: operator,
+                target_value: targetValue,
+                color: color,
+                priorite: priority,
+                actif: true
+            };
+            
+            try {
+                const response = await fetch('/api/graphics/color_rules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ruleData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccessMessage('Règle créée avec succès');
+                    clearRuleForm();
+                    loadObjectRules();
+                } else {
+                    showErrorMessage('Erreur création règle: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur réseau: ' + error.message);
+            }
+        }
+
+        async function loadObjectRules() {
+            if (!selectedObject) {
+                clearRulesDisplay();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/graphics/color_rules/${selectedObject.id}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentObjectColorRules = result.rules;
+                    displayRules(result.rules);
+                } else {
+                    console.error('Erreur chargement règles:', result.error);
+                    clearRulesDisplay();
+                }
+            } catch (error) {
+                console.error('Erreur réseau:', error);
+                clearRulesDisplay();
+            }
+        }
+
+        function displayRules(rules) {
+            const container = document.getElementById('rules-container');
+            const countSpan = document.getElementById('rules-count');
+            
+            countSpan.textContent = rules.length;
+            
+            if (rules.length === 0) {
+                container.innerHTML = '<div class="no-rules">Aucune règle définie</div>';
+                return;
+            }
+            
+            container.innerHTML = rules.map(rule => createRuleHTML(rule)).join('');
+        }
+
+        function createRuleHTML(rule) {
+            const statusText = rule.actif ? '✅ Actif' : '❌ Inactif';
+            const statusClass = rule.actif ? '' : 'inactive';
+            
+            return `
+                <div class="rule-item ${statusClass}">
+                    <div class="rule-header-item">
+                        <div class="rule-name">${rule.nom_regle}</div>
+                        <div class="rule-status">${statusText}</div>
+                    </div>
+                    
+                    <div class="rule-details">
+                        <span class="rule-condition">${rule.tag_name} ${rule.operator} ${rule.target_value}</span>
+                        <div class="rule-color-badge" style="background-color: ${rule.color};" title="${rule.color}"></div>
+                        <span>Priorité: ${rule.priorite}</span>
+                    </div>
+                    
+                    <div class="rule-actions">
+                        <button class="btn btn-small btn-test" onclick="testRule(${rule.id})" title="Tester">
+                            🧪 Test
+                        </button>
+                        <button class="btn btn-small btn-toggle" onclick="toggleRule(${rule.id}, ${!rule.actif})" title="${rule.actif ? 'Désactiver' : 'Activer'}">
+                            ${rule.actif ? '⏸️' : '▶️'}
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="deleteRule(${rule.id})" title="Supprimer">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function deleteRule(ruleId) {
+            if (!confirm('Supprimer cette règle ?')) return;
+            
+            try {
+                const response = await fetch(`/api/graphics/color_rules/${ruleId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccessMessage('Règle supprimée');
+                    loadObjectRules();
+                } else {
+                    showErrorMessage('Erreur suppression: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur réseau: ' + error.message);
+            }
+        }
+
+        async function toggleRule(ruleId, newState) {
+            try {
+                const response = await fetch(`/api/graphics/color_rules/${ruleId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ actif: newState })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccessMessage(`Règle ${newState ? 'activée' : 'désactivée'}`);
+                    loadObjectRules();
+                } else {
+                    showErrorMessage('Erreur modification: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur réseau: ' + error.message);
+            }
+        }
+
+        async function testRule(ruleId) {
+            const testValue = prompt('Valeur à tester:');
+            if (testValue === null) return;
+            
+            try {
+                const response = await fetch(`/api/graphics/color_rules/test/${ruleId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ test_value: testValue })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const message = `Test: ${result.message}`;
+                    if (result.result) {
+                        showSuccessMessage(`✅ ${message} → Couleur ${result.color_applied} appliquée`);
+                    } else {
+                        showMessage(`❌ ${message} → Couleur normale conservée`, 'info');
+                    }
+                } else {
+                    showErrorMessage('Erreur test: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur réseau: ' + error.message);
+            }
+        }
+
+        async function deleteAllRules() {
+            if (!selectedObject) return;
+            if (!confirm('Supprimer TOUTES les règles de cet objet ?')) return;
+            
+            try {
+                const response = await fetch(`/api/graphics/color_rules/${selectedObject.id}/bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete_all' })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccessMessage('Toutes les règles supprimées');
+                    loadObjectRules();
+                } else {
+                    showErrorMessage('Erreur suppression: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur réseau: ' + error.message);
+            }
+        }
+
+        function clearRuleForm() {
+            document.getElementById('rule-name').value = '';
+            document.getElementById('rule-tag').value = '';
+            document.getElementById('rule-operator').value = '=';
+            document.getElementById('rule-value').value = '';
+            document.getElementById('rule-color').value = '#ff0000';
+            document.getElementById('rule-priority').value = '1';
+            
+            // Mettre à jour l'aperçu
+            const colorPreview = document.getElementById('color-preview');
+            if (colorPreview) {
+                colorPreview.style.backgroundColor = '#ff0000';
+            }
+        }
+
+        function clearRulesDisplay() {
+            const container = document.getElementById('rules-container');
+            const countSpan = document.getElementById('rules-count');
+            
+            if (container) container.innerHTML = '<div class="no-rules">Sélectionner un objet</div>';
+            if (countSpan) countSpan.textContent = '0';
+            
+            currentObjectColorRules = [];
+        }
+
+        // Sauvegarde
+        async function saveObjectToServer(object) {
+            try {
+                const dataToSave = {
+                    nom: object.nom,
+                    x: object.x,
+                    y: object.y,
+                    width: object.width,
+                    height: object.height,
+                    couleur_normale: object.couleur_normale,
+                    // SUPPRIMÉ : couleur_active: object.couleur_active,
+                    texte: object.texte,
+                    tag_lie: object.tag_lie,
+                    action_clic: object.action_clic,
+                    valeur_ecriture: object.valeur_ecriture,
+                    page_destination: object.page_destination,
+                    icon_data: object.regles?.icon_data,
+                    icon_source: object.regles?.icon_source,
+                    icon_size: object.regles?.icon_size,
+                    icon_rotation: object.regles?.icon_rotation,
+                    icon_keep_aspect: object.regles?.icon_keep_aspect
+                };
+
+                const response = await fetch(`/api/graphics/animations/${object.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSave)
+                });
+
+                if (!response.ok) {
+                    console.error('Erreur sauvegarde objet');
+                }
+            } catch (error) {
+                console.error('Erreur sauvegarde:', error);
+            }
+        }
+
+        // Chargement des données
+        async function loadExistingObjects() {
+            if (!currentPage) return;
+            
+            try {
+                const response = await fetch(`/api/graphics/animations/${currentPage}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    objects = result.animations;
+                    
+                    const canvas = document.getElementById('design-canvas');
+                    if (canvas) {
+                        canvas.innerHTML = '';
+                        objects.forEach((obj, index) => {
+                            setTimeout(() => renderObject(obj), index * 100);
+                        });
+                    }
+                    
+                    updateObjectCounter();
+                }
+            } catch (error) {
+                console.error('Erreur chargement objets:', error);
+            }
+        }
+
+        async function loadAvailablePages() {
+            try {
+                const response = await fetch('/api/graphics/pages');
+                const result = await response.json();
+                
+                if (result.success) {
+                    availablePages = result.pages;
+                    
+                    const selector = document.getElementById('page-selector');
+                    if (selector) {
+                        selector.innerHTML = '<option value="">-- Nouvelle page --</option>';
+                        
+                        result.pages.forEach(page => {
+                            const option = document.createElement('option');
+                            option.value = page.id;
+                            option.textContent = page.nom;
+                            if (page.id === currentPage) {
+                                option.selected = true;
+                            }
+                            selector.appendChild(option);
+                        });
+                    }
+                    
+                    populateNavigationPageSelector();
+                }
+            } catch (error) {
+                console.error('Erreur chargement pages:', error);
+            }
+        }
+
+        function populateNavigationPageSelector() {
+            const selector = document.getElementById('prop-navigation-page');
+            if (!selector) return;
+            
+            selector.innerHTML = '<option value="">-- Sélectionner une page --</option>';
+            
+            availablePages.forEach(page => {
+                if (page.id !== currentPage) {
+                    const option = document.createElement('option');
+                    option.value = page.id;
+                    option.textContent = `${page.nom} (${page.largeur}×${page.hauteur})`;
+                    selector.appendChild(option);
+                }
+            });
+        }
+
+        // Canvas
+        function updateCanvasSize() {
+            const width = parseInt(document.getElementById('canvas-width').value) || 1920;
+            const height = parseInt(document.getElementById('canvas-height').value) || 1080;
+            
+            const finalWidth = Math.max(800, Math.min(4000, width));
+            const finalHeight = Math.max(600, Math.min(3000, height));
+            
+            document.getElementById('canvas-width').value = finalWidth;
+            document.getElementById('canvas-height').value = finalHeight;
+            
+            const canvas = document.getElementById('design-canvas');
+            if (canvas) {
+                canvas.style.width = finalWidth + 'px';
+                canvas.style.height = finalHeight + 'px';
+                
+                document.documentElement.style.setProperty('--page-width', finalWidth + 'px');
+                document.documentElement.style.setProperty('--page-height', finalHeight + 'px');
+                
+                const sizeDisplay = document.getElementById('current-canvas-size');
+                if (sizeDisplay) {
+                    sizeDisplay.textContent = `${finalWidth}×${finalHeight}px`;
+                }
+                
+                markAsChanged();
+            }
+        }
+
+        function applyStandardSizes() {
+            const sizes = [
+                { name: "Full HD", width: 1920, height: 1080 },
+                { name: "4K UHD", width: 3840, height: 2160 },
+                { name: "HD", width: 1280, height: 720 },
+                { name: "WXGA", width: 1366, height: 768 }
+            ];
+            
+            let options = sizes.map(size => `${size.name} (${size.width}×${size.height})`).join('\n');
+            const choice = prompt(`Choisissez une taille standard:\n\n${options}\n\nTapez le nom (ex: "Full HD"):`, "Full HD");
+            
+            if (choice) {
+                const selectedSize = sizes.find(s => choice.toLowerCase().includes(s.name.toLowerCase()));
+                if (selectedSize) {
+                    document.getElementById('canvas-width').value = selectedSize.width;
+                    document.getElementById('canvas-height').value = selectedSize.height;
+                    updateCanvasSize();
+                    showSuccessMessage(`Taille appliquée: ${selectedSize.name}`);
+                }
+            }
+        }
+
+        // Actions
+        function updateObjectCounter() {
+            const counter = document.getElementById('object-count');
+            if (counter) {
+                counter.textContent = objects.length;
+            }
+        }
+
+        async function deleteSelectedObject() {
+            if (!selectedObject) return;
+            
+            if (confirm('Supprimer cet objet ?')) {
+                try {
+                    const response = await fetch(`/api/graphics/animations/${selectedObject.id}`, { method: 'DELETE' });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        const element = document.getElementById(`object-${selectedObject.id}`);
+                        if (element) {
+                            element.style.transform = 'scale(0)';
+                            element.style.opacity = '0';
+                            
+                            setTimeout(() => {
+                                objects = objects.filter(obj => obj.id !== selectedObject.id);
+                                if (element) element.remove();
+                                deselectObject();
+                                updateObjectCounter();
+                                markAsChanged();
+                                showSuccessMessage('Objet supprimé');
+                            }, 300);
+                        }
+                    } else {
+                        showErrorMessage('Erreur suppression: ' + result.error);
+                    }
+                } catch (error) {
+                    showErrorMessage('Erreur suppression: ' + error.message);
+                }
+            }
+        }
+
+        function testRuntime() {
+            if (currentPage) {
+                window.open(`/graphics/runtime/${currentPage}`, '_blank');
+            } else {
+                showErrorMessage('Sauvegardez d\'abord la page');
+            }
+        }
+
+        async function savePage() {
+            if (!currentPage) {
+                showErrorMessage('Aucune page à sauvegarder');
+                return;
+            }
+            
+            const saveButton = document.getElementById('save-button');
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.innerHTML = '⏳ Sauvegarde...';
+            }
+            
+            try {
+                const width = parseInt(document.getElementById('canvas-width').value) || 1920;
+                const height = parseInt(document.getElementById('canvas-height').value) || 1080;
+                
+                const pageUpdateResponse = await fetch(`/api/graphics/pages/${currentPage}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        largeur_page: width,
+                        hauteur_page: height
+                    })
+                });
+                
+                const savePromises = objects.map(obj => saveObjectToServer(obj));
+                await Promise.all(savePromises);
+                
+                markAsSaved();
+                showSuccessMessage(`Page sauvegardée (${width}×${height}px) !`);
+                
+            } catch (error) {
+                showErrorMessage('Erreur lors de la sauvegarde: ' + error.message);
+            } finally {
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    updateSaveButtonState();
+                }
+            }
+        }
+
+        async function createNewPage() {
+            const nom = prompt('Nom de la nouvelle page:');
+            if (!nom) return;
+
+            try {
+                const response = await fetch('/api/graphics/pages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nom: nom,
+                        largeur: 1920,
+                        hauteur: 1080,
+                        couleur_fond: '#F0F0F0'
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    window.location.href = `/graphics/designer/${result.page_id}`;
+                } else {
+                    showErrorMessage('Erreur création page: ' + result.error);
+                }
+            } catch (error) {
+                showErrorMessage('Erreur création page: ' + error.message);
+            }
+        }
+
+        function loadSelectedPage() {
+            const selector = document.getElementById('page-selector');
+            if (selector) {
+                const pageId = selector.value;
+                if (pageId) {
+                    window.location.href = `/graphics/designer/${pageId}`;
+                } else {
+                    window.location.href = '/graphics/designer';
+                }
+            }
+        }
+
+        function applyProperties() {
+            if (selectedObject) {
+                showSuccessMessage('Propriétés appliquées automatiquement');
+            }
+        }
+
+        function deleteSelected() {
+            deleteSelectedObject();
+        }
+
+        // Drag des objets
+        let isDragging = false;
+        let dragOffset = {x: 0, y: 0};
+
+        function startDrag(e, objectId) {
+            if (e.target.classList.contains('design-object')) {
+                isDragging = true;
+                const element = document.getElementById(`object-${objectId}`);
+                const rect = element.getBoundingClientRect();
+                
+                dragOffset.x = e.clientX - rect.left;
+                dragOffset.y = e.clientY - rect.top;
+                
+                selectObject(objectId);
+                element.style.cursor = 'grabbing';
+                element.style.zIndex = '1000';
+                
+                document.addEventListener('mousemove', handleDrag);
+                document.addEventListener('mouseup', stopDrag);
+                e.preventDefault();
+            }
+        }
+
+        function handleDrag(e) {
+            if (!isDragging || !selectedObject) return;
+            
+            const canvas = document.getElementById('design-canvas');
+            const scrollArea = document.querySelector('.canvas-scroll-area');
+            
+            if (!canvas || !scrollArea) return;
+            
+            const canvasRect = canvas.getBoundingClientRect();
+            const x = e.clientX - canvasRect.left - dragOffset.x + scrollArea.scrollLeft;
+            const y = e.clientY - canvasRect.top - dragOffset.y + scrollArea.scrollTop;
+            
+            selectedObject.x = Math.max(0, Math.round(x));
+            selectedObject.y = Math.max(0, Math.round(y));
+            
+            const element = document.getElementById(`object-${selectedObject.id}`);
+            if (element) {
+                element.style.left = selectedObject.x + 'px';
+                element.style.top = selectedObject.y + 'px';
+            }
+            
+            document.getElementById('prop-x').value = selectedObject.x;
+            document.getElementById('prop-y').value = selectedObject.y;
+        }
+
+        function stopDrag() {
+            if (isDragging && selectedObject) {
+                const element = document.getElementById(`object-${selectedObject.id}`);
+                if (element) {
+                    element.style.cursor = 'move';
+                    element.style.zIndex = '';
+                }
+                markAsChanged();
+                saveObjectToServer(selectedObject);
+            }
+            
+            isDragging = false;
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // Gestion des modifications
+        function markAsChanged() {
+            hasUnsavedChanges = true;
+            updateSaveButtonState();
+        }
+
+        function markAsSaved() {
+            hasUnsavedChanges = false;
+            updateSaveButtonState();
+        }
+
+        function updateSaveButtonState() {
+            const saveButton = document.getElementById('save-button');
+            if (!saveButton) return;
+            
+            if (hasUnsavedChanges) {
+                saveButton.innerHTML = '💾 Sauvegarder *';
+                saveButton.classList.remove('btn-success');
+                saveButton.classList.add('btn-save-modified');
+            } else {
+                saveButton.innerHTML = '💾 Sauvegarder';
+                saveButton.classList.remove('btn-save-modified');
+                saveButton.classList.add('btn-success');
+            }
+        }
+
+        function initializeSaveButton() {
+            const saveButton = document.getElementById('save-button');
+            if (saveButton) {
+                console.log('✅ Bouton sauvegarde initialisé');
+            }
+        }
+
+        // Messages
+        function showSuccessMessage(message) {
+            createToast(message, 'success');
+        }
+
+        function showErrorMessage(message) {
+            createToast(message, 'error');
+        }
+
+        function showMessage(message, type = 'info') {
+            createToast(message, type);
+        }
+
+        function createToast(message, type) {
+            const toast = document.createElement('div');
+            const isSuccess = type === 'success';
+            const isInfo = type === 'info';
+            
+            let bgColor = 'linear-gradient(45deg, #dc3545, #c82333)'; // error
+            let icon = '❌';
+            
+            if (isSuccess) {
+                bgColor = 'linear-gradient(45deg, #28a745, #20852c)';
+                icon = '✅';
+            } else if (isInfo) {
+                bgColor = 'linear-gradient(45deg, #17a2b8, #138496)';
+                icon = 'ℹ️';
+            }
+            
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${bgColor};
+                color: white;
+                padding: 15px 25px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                z-index: 10000;
+                font-weight: 600;
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+                word-wrap: break-word;
+            `;
+            
+            toast.innerHTML = `<div style="display: flex; align-items: center; gap: 10px;"><span>${icon}</span><span>${message}</span></div>`;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, isSuccess ? 3000 : 5000);
+            
+            toast.addEventListener('click', () => {
+                toast.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            });
+        }
+
+        function injectNavigationStyles() {
+            const navigationStyles = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+                @keyframes pulseModified {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                @keyframes successFlash {
+                    0% { background-color: rgba(40, 167, 69, 0.3); }
+                    100% { background-color: transparent; }
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .fade-in { animation: fadeIn 0.3s ease-in-out; }
+                .success-flash { animation: successFlash 0.5s ease-out !important; }
+            `;
+
+            const styleElement = document.createElement('style');
+            styleElement.textContent = navigationStyles;
+            document.head.appendChild(styleElement);
+        }
+
+        console.log('🎨 Éditeur graphique avec système de couleurs dynamiques initialisé');
+    </script>
+</body>
+</html>

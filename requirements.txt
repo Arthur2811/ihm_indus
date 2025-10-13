@@ -1,0 +1,33 @@
+# =================================================================
+# DÉPENDANCES IHM INDUSTRIELLE ARTHUR - COMPATIBLE PYTHON 3.13
+# =================================================================
+
+# Framework web - Versions stables et compatibles
+Flask==3.0.0
+Werkzeug==3.0.1
+Jinja2==3.1.2
+MarkupSafe==2.1.3
+click==8.1.7
+itsdangerous==2.1.2
+
+# Base de données - Version développement pour Python 3.13
+# IMPORTANT: SQLAlchemy stable ne fonctionne pas avec Python 3.13
+# On utilise la version de développement qui corrige le problème
+https://github.com/sqlalchemy/sqlalchemy/archive/main.zip
+Flask-SQLAlchemy==3.1.1
+
+# Communication Siemens S7 - Fonctionne parfaitement
+python-snap7==1.3
+
+# Configuration et utilitaires
+python-dotenv==1.0.0
+typing-extensions>=4.8.0
+
+# Développement et tests (optionnel)
+# pytest==7.4.3
+# pytest-flask==1.3.0
+
+# Notes importantes:
+# - Cette configuration est spécifiquement pour Python 3.13
+# - Si vous utilisez Python 3.11 ou 3.12, remplacez la ligne SQLAlchemy par: SQLAlchemy==2.0.23
+# - Le python-snap7 nécessite les bibliothèques Snap7 installées sur le système

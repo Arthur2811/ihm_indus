@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervision - IHM Arthur</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/Monitoring/supervision.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête -->
+        <div class="header">
+            <h1>📊 Supervision Temps Réel</h1>
+            <p>Monitoring en temps réel des variables automate</p>
+            
+            <!-- Navigation -->
+            <div class="navigation">
+            <a href="{{ url_for('main.index') }}" class="nav-btn">🖧 Connexion</a>
+            <a href="{{ url_for('main.tags') }}" class="nav-btn">🏷️ Gestion Tags</a>
+            <a href="{{ url_for('main.supervision') }}" class="nav-btn">🔖 Tags Espion</a>
+            <a href="{{ url_for('main.graphics_designer') }}" class="nav-btn">🎨 Éditeur IHM</a>
+            <a href="{{ url_for('main.user_management') }}" class="nav-btn">👥 Utilisateurs</a>
+            <a href="{{ url_for('main.projects_management') }}" class="nav-btn">📁 Projet</a>
+            <a href="{{ url_for('main.dashboard') }}" class="nav-btn">📊 Dashbord</a>
+            <form action="{{ url_for('main.disconnect_automate') }}" method="POST" style="display:inline;">
+                <button type="submit" class="nav-btn">🔌 Déconnexion</button>
+            </form>
+        </div>
+
+        <!-- Section Supervision -->
+        <div class="card">
+            <h2>📊 Supervision en Temps Réel</h2>
+            
+            <!-- Dashboard de statut -->
+            <div class="status-dashboard">
+                <div class="status-card {% if status.connected %}{% if status.simulation_mode %}simulation{% else %}online{% endif %}{% else %}offline{% endif %}" id="connection-card">
+                    <div class="status-number" id="connection-status">
+                        {% if status.connected %}
+                            {% if status.simulation_mode %}🔄{% else %}✅{% endif %}
+                        {% else %}❌{% endif %}
+                    </div>
+                    <div class="status-label">Connexion</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-number" id="tags-count">{{ tags|length if tags else 0 }}</div>
+                    <div class="status-label">Tags Supervisés</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-number" id="good-quality-count">0</div>
+                    <div class="status-label">Qualité Bonne</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-number" id="last-update-time">--:--:--</div>
+                    <div class="status-label">Dernière MAJ</div>
+                </div>
+            </div>
+
+            <!-- Contrôles de supervision -->
+            <div class="controls-bar">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()">
+                    <label for="auto-refresh">🔄 Rafraîchissement automatique</label>
+                </div>
+                
+                <select id="refresh-interval">
+                    <option value="1000">1 seconde</option>
+                    <option value="2000" selected>2 secondes</option>
+                    <option value="5000">5 secondes</option>
+                    <option value="10000">10 secondes</option>
+                    <option value="30000">30 secondes</option>
+                </select>
+
+                <button type="button" onclick="lireTousTags()" class="btn btn-primary btn-small">
+                    <span id="refresh-icon">🔄</span> LIRE MAINTENANT
+                </button>
+                
+                <button type="button" onclick="testerTousLesTags()" class="btn btn-info btn-small">
+                    🧪 TEST COMPLET
+                </button>
+                
+                <button type="button" onclick="resetValues()" class="btn btn-secondary btn-small">
+                    🔄 RESET VALEURS
+                </button>
+                
+                <button type="button" onclick="toggleLog()" class="btn btn-warning btn-small">
+                    📜 LOG
+                </button>
+            </div>
+
+            <!-- Filtres rapides -->
+            <div class="controls-bar">
+                <strong>Filtres rapides:</strong>
+                <button type="button" onclick="filterByType('BOOL')" class="btn btn-secondary btn-small">
+                    📍 BOOL seulement
+                </button>
+                <button type="button" onclick="filterByAccess('RW')" class="btn btn-secondary btn-small">
+                    ✏️ Écriture possible
+                </button>
+                <button type="button" onclick="filterByQuality('BAD')" class="btn btn-danger btn-small">
+                    ⚠️ Erreurs seulement
+                </button>
+                <button type="button" onclick="clearFilters()" class="btn btn-secondary btn-small">
+                    🗑️ Tout afficher
+                </button>
+            </div>
+
+            <!-- Tableau de supervision -->
+            <div style="overflow-x: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tag</th>
+                            <th>Adresse</th>
+                            <th>Type</th>
+                            <th>Valeur</th>
+                            <th>Qualité</th>
+                            <th>Dernière Lecture</th>
+                            <th>Tendance</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supervision-list">
+                        {% if tags %}
+                            {% for tag in tags %}
+                            <tr id="tag-row-{{ tag.nom_tag }}" data-tag-name="{{ tag.nom_tag }}">
+                                <td><strong>{{ tag.nom_tag }}</strong></td>
+                                <td><code>{{ tag.adresse_tag }}</code></td>
+                                <td>{{ tag.type_donnee }}</td>
+                                <td>
+                                    <span class="tag-value" id="value-{{ tag.nom_tag }}">
+                                        {{ tag.valeur or '-' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="quality-indicator quality-uncertain" id="quality-{{ tag.nom_tag }}">
+                                        {{ tag.qualite or 'UNKNOWN' }}
+                                    </span>
+                                </td>
+                                <td id="timestamp-{{ tag.nom_tag }}">
+                                    {{ tag.timestamp_lecture.strftime('%H:%M:%S') if tag.timestamp_lecture else '-' }}
+                                </td>
+                                <td id="trend-{{ tag.nom_tag }}">➡️</td>
+                                <td class="tag-actions">
+                                    <button onclick="lireTag('{{ tag.nom_tag }}')" class="btn btn-primary btn-small" title="Lire">📖</button>
+                                    {% if tag.acces in ['W', 'RW'] %}
+                                    <button onclick="ecrireTag('{{ tag.nom_tag }}')" class="btn btn-success btn-small" title="Écrire">✏️</button>
+                                    {% endif %}
+                                    <button onclick="showTagHistory('{{ tag.nom_tag }}')" class="btn btn-info btn-small" title="Historique">📊</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: #666; padding: 20px;">
+                                    Aucun tag configuré pour la supervision.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Actions globales -->
+            <div class="controls-bar" style="margin-top: 20px;">
+                <strong>Actions globales:</strong>
+                <button type="button" onclick="exportSupervisionData()" class="btn btn-info btn-small">
+                    💾 EXPORTER DONNÉES
+                </button>
+                <button type="button" onclick="generateReport()" class="btn btn-info btn-small">
+                    📄 RAPPORT
+                </button>
+                <button type="button" onclick="configureAlarms()" class="btn btn-warning btn-small">
+                    🚨 ALARMES
+                </button>
+                <button type="button" onclick="openTrendView()" class="btn btn-success btn-small">
+                    📈 TENDANCES
+                </button>
+            </div>
+
+            <!-- Panel de log -->
+            <div id="log-panel" class="log-panel" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="color: #00ff00;">📜 Log de Supervision</strong>
+                    <button onclick="clearLog()" style="background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 4px;">
+                        Clear
+                    </button>
+                </div>
+                <div id="log-content">
+                    > Système de supervision initialisé<br>
+                    > En attente de données...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let refreshInterval = null;
+        let supervisionStats = {
+            totalTags: {{ tags|length if tags else 0 }},
+            goodQuality: 0,
+            lastUpdate: null
+        };
+
+        // Gestion de l'auto-refresh
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('auto-refresh');
+            const interval = parseInt(document.getElementById('refresh-interval').value);
+
+            if (checkbox.checked) {
+                refreshInterval = setInterval(() => {
+                    lireTousTags(true); // Mode silencieux
+                }, interval);
+                
+                logMessage(`✅ Rafraîchissement automatique activé (${interval/1000}s)`);
+                updateRefreshIcon(true);
+            } else {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                    refreshInterval = null;
+                }
+                logMessage('❌ Rafraîchissement automatique désactivé');
+                updateRefreshIcon(false);
+            }
+        }
+
+        // Mettre à jour l'icône de rafraîchissement
+        function updateRefreshIcon(isRefreshing) {
+            const icon = document.getElementById('refresh-icon');
+            if (isRefreshing) {
+                icon.innerHTML = '<span class="refresh-spinner"></span>';
+            } else {
+                icon.textContent = '🔄';
+            }
+        }
+
+        // Lire tous les tags
+        async function lireTousTags(silentMode = false) {
+            if (!silentMode) {
+                updateRefreshIcon(true);
+                logMessage('🔄 Lecture de tous les tags...');
+            }
+
+            try {
+                const response = await fetch('/api/read_all');
+                const data = await response.json();
+
+                if (data.success && data.tags) {
+                    let successCount = 0;
+                    let goodQualityCount = 0;
+
+                    data.tags.forEach(tag => {
+                        const valueElement = document.getElementById(`value-${tag.nom_tag}`);
+                        const qualityElement = document.getElementById(`quality-${tag.nom_tag}`);
+                        const timestampElement = document.getElementById(`timestamp-${tag.nom_tag}`);
+
+                        if (valueElement) {
+                            valueElement.textContent = formatValue(tag.valeur, tag.type_donnee);
+                            valueElement.className = `tag-value ${getValueClass(tag.valeur, tag.type_donnee)}`;
+                            
+                            if (!silentMode) {
+                                valueElement.classList.add('updated');
+                                setTimeout(() => {
+                                    valueElement.classList.remove('updated');
+                                }, 500);
+                            }
+                            successCount++;
+                        }
+                        
+                        if (qualityElement) {
+                            qualityElement.textContent = tag.qualite;
+                            qualityElement.className = `quality-indicator ${getQualityClass(tag.qualite)}`;
+                            if (tag.qualite && tag.qualite.includes('GOOD')) {
+                                goodQualityCount++;
+                            }
+                        }
+                        
+                        if (timestampElement) {
+                            timestampElement.textContent = new Date().toLocaleTimeString();
+                        }
+                    });
+
+                    supervisionStats.goodQuality = goodQualityCount;
+                    supervisionStats.lastUpdate = new Date();
+                    updateDashboard();
+                    
+                    if (!silentMode) {
+                        logMessage(`✅ ${successCount} tags lus avec succès`);
+                    }
+                } else {
+                    logMessage('❌ Erreur lecture des tags: ' + (data.error || 'Erreur inconnue'));
+                }
+
+            } catch (error) {
+                logMessage('❌ Erreur réseau: ' + error.message);
+            } finally {
+                if (!silentMode) {
+                    updateRefreshIcon(false);
+                }
+            }
+        }
+
+        // Formater la valeur selon le type
+        function formatValue(valeur, type) {
+            if (valeur === null || valeur === undefined) return '-';
+            
+            switch (type) {
+                case 'BOOL':
+                    return valeur ? 'TRUE' : 'FALSE';
+                case 'REAL':
+                    return parseFloat(valeur).toFixed(2);
+                case 'INT':
+                case 'DINT':
+                    return parseInt(valeur).toString();
+                default:
+                    return valeur.toString();
+            }
+        }
+
+        // Obtenir la classe CSS pour la valeur
+        function getValueClass(valeur, type) {
+            if (type === 'BOOL') {
+                return valeur ? 'bool-true' : 'bool-false';
+            } else if (['INT', 'DINT', 'REAL'].includes(type)) {
+                return 'number';
+            } else {
+                return '';
+            }
+        }
+
+        // Obtenir la classe CSS pour la qualité
+        function getQualityClass(qualite) {
+            switch (qualite) {
+                case 'GOOD':
+                case 'GOOD_CACHED':
+                    return 'quality-good';
+                case 'BAD':
+                case 'ERROR':
+                    return 'quality-bad';
+                default:
+                    return 'quality-uncertain';
+            }
+        }
+
+        // Mettre à jour le dashboard
+        function updateDashboard() {
+            document.getElementById('good-quality-count').textContent = supervisionStats.goodQuality;
+            document.getElementById('last-update-time').textContent = 
+                supervisionStats.lastUpdate ? supervisionStats.lastUpdate.toLocaleTimeString('fr-FR') : '--:--:--';
+        }
+
+        // Lire un tag spécifique
+        async function lireTag(tagName) {
+            try {
+                logMessage(`📖 Lecture ${tagName}...`);
+                
+                const response = await fetch(`/api/read/${tagName}`);
+                const data = await response.json();
+
+                if (data.success !== false) {
+                    // Mettre à jour l'affichage
+                    const valueElement = document.getElementById(`value-${tagName}`);
+                    const qualityElement = document.getElementById(`quality-${tagName}`);
+                    const timestampElement = document.getElementById(`timestamp-${tagName}`);
+
+                    if (valueElement) {
+                        valueElement.textContent = formatValue(data.valeur, data.type_donnee);
+                        valueElement.className = `tag-value ${getValueClass(data.valeur, data.type_donnee)} updated`;
+                        
+                        setTimeout(() => {
+                            valueElement.classList.remove('updated');
+                        }, 500);
+                    }
+                    
+                    if (qualityElement) {
+                        qualityElement.textContent = data.qualite;
+                        qualityElement.className = `quality-indicator ${getQualityClass(data.qualite)}`;
+                    }
+                    
+                    if (timestampElement) {
+                        timestampElement.textContent = new Date().toLocaleTimeString('fr-FR');
+                    }
+
+                    logMessage(`✅ ${tagName}: ${formatValue(data.valeur, data.type_donnee)} (${data.qualite})`);
+                } else {
+                    logMessage(`❌ Erreur lecture ${tagName}: ${data.error}`);
+                }
+
+            } catch (error) {
+                logMessage(`❌ Erreur lecture ${tagName}: ${error.message}`);
+            }
+        }
+
+        // Écrire un tag
+        async function ecrireTag(tagName) {
+            const valeur = prompt(`Écrire une valeur dans ${tagName}:`);
+            if (valeur === null) return;
+
+            try {
+                logMessage(`✏️ Écriture ${tagName} = ${valeur}...`);
+                
+                const response = await fetch(`/api/write/${tagName}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ valeur: valeur })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    logMessage(`✅ ${tagName} écrit: ${data.valeur}`);
+                    // Relire le tag pour vérifier
+                    setTimeout(() => lireTag(tagName), 500);
+                } else {
+                    logMessage(`❌ Erreur écriture ${tagName}: ${data.error}`);
+                }
+
+            } catch (error) {
+                logMessage(`❌ Erreur écriture ${tagName}: ${error.message}`);
+            }
+        }
+
+        // Test complet de tous les tags
+        async function testerTousLesTags() {
+            try {
+                logMessage('🧪 Test complet en cours...');
+                
+                const response = await fetch('/api/test_tous_tags');
+                const data = await response.json();
+                
+                if (data.success) {
+                    logMessage(`✅ Test réussi en mode ${data.mode}`);
+                    
+                    // Afficher les résultats dans le log
+                    Object.keys(data.donnees).forEach(dbName => {
+                        if (dbName !== 'timestamp') {
+                            logMessage(`📂 ${dbName}:`);
+                            Object.entries(data.donnees[dbName]).forEach(([tagName, value]) => {
+                                logMessage(`  • ${tagName}: ${value}`);
+                            });
+                        }
+                    });
+                } else {
+                    logMessage(`❌ Erreur test: ${data.error}`);
+                }
+                
+            } catch (error) {
+                logMessage(`❌ Erreur test: ${error.message}`);
+            }
+        }
+
+        // Filtres
+        function filterByType(type) {
+            logMessage(`🔍 Filtre appliqué: type ${type}`);
+            // Implémenter le filtrage réel ici
+        }
+
+        function filterByAccess(access) {
+            logMessage(`🔍 Filtre appliqué: accès ${access}`);
+            // Implémenter le filtrage réel ici
+        }
+
+        function filterByQuality(quality) {
+            logMessage(`🔍 Filtre appliqué: qualité ${quality}`);
+            // Implémenter le filtrage réel ici
+        }
+
+        function clearFilters() {
+            logMessage('🗑️ Filtres effacés - Tous les tags affichés');
+        }
+
+        // Reset des valeurs
+        function resetValues() {
+            if (confirm('Remettre à zéro toutes les valeurs affichées ?')) {
+                document.querySelectorAll('[id^="value-"]').forEach(element => {
+                    element.textContent = '-';
+                    element.className = 'tag-value';
+                });
+                
+                document.querySelectorAll('[id^="quality-"]').forEach(element => {
+                    element.textContent = 'UNKNOWN';
+                    element.className = 'quality-indicator quality-uncertain';
+                });
+                
+                logMessage('🔄 Valeurs remises à zéro');
+            }
+        }
+
+        // Gestion du log
+        function toggleLog() {
+            const logPanel = document.getElementById('log-panel');
+            const isVisible = logPanel.style.display !== 'none';
+            logPanel.style.display = isVisible ? 'none' : 'block';
+            
+            if (!isVisible) {
+                logMessage('📜 Panel de log ouvert');
+            }
+        }
+
+        function logMessage(message) {
+            const logContent = document.getElementById('log-content');
+            const timestamp = new Date().toLocaleTimeString('fr-FR');
+            logContent.innerHTML += `<br>[${timestamp}] ${message}`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log-content').innerHTML = '> Log effacé<br>';
+        }
+
+        // Fonctions supplémentaires
+        function showTagHistory(tagName) {
+            logMessage(`📊 Historique de ${tagName} (fonctionnalité à implémenter)`);
+            alert(`📊 Historique de ${tagName}\n\nFonctionnalité en développement`);
+        }
+
+        function exportSupervisionData() {
+            const data = {
+                export_date: new Date().toISOString(),
+                stats: supervisionStats
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { 
+                type: 'application/json' 
+            });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `supervision_data_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            logMessage('💾 Données de supervision exportées');
+        }
+
+        function generateReport() {
+            logMessage('📄 Génération de rapport (fonctionnalité à implémenter)');
+            alert('📄 Génération de rapport\n\nFonctionnalité en développement');
+        }
+
+        function configureAlarms() {
+            logMessage('🚨 Configuration des alarmes (fonctionnalité à implémenter)');
+            alert('🚨 Configuration des alarmes\n\nFonctionnalité en développement');
+        }
+
+        function openTrendView() {
+            logMessage('📈 Vue tendances (fonctionnalité à implémenter)');
+            alert('📈 Vue des tendances\n\nFonctionnalité en développement');
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Page Supervision Temps Réel - Prête');
+            
+            logMessage('🚀 Système de supervision initialisé');
+            updateDashboard();
+        });
+
+        // Nettoyage avant fermeture
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

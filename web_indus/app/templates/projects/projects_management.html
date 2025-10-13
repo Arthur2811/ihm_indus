@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Projets - IHM Arthur</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/projects/projects_management.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête -->
+        <div class="header">
+            <h1>📁 Gestion des Projets IHM</h1>
+            <div class="user-info">
+                <span>👤 {{ current_user.nom_complet }}</span>
+                <span class="role-badge role-{{ current_user.role.lower() }}">{{ current_user.role }}</span>
+                <a href="{{ url_for('main.logout') }}" class="btn btn-secondary btn-small">📤 Déconnexion</a>
+            </div>
+        </div>
+
+        <!-- Messages flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Projet actuel sélectionné -->
+        {% if current_project %}
+        <div class="current-project-bar">
+            <div>
+                <strong>📂 Projet actuel :</strong> 
+                <span class="project-name">{{ current_project.nom_projet }}</span>
+                <span class="project-version">v{{ current_project.version_projet }}</span>
+            </div>
+            <div class="project-actions">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary btn-small">
+                    🏠 Accéder au Dashboard
+                </a>
+                <button onclick="clearCurrentProject()" class="btn btn-secondary btn-small">
+                    ❌ Désélectionner
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Statistiques globales -->
+        <div class="stats-dashboard">
+            <div class="stat-card">
+                <div class="stat-number">{{ summary.total_projets or 0 }}</div>
+                <div class="stat-label">Projets Total</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ summary.projets_actifs or 0 }}</div>
+                <div class="stat-label">Actifs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ summary.projets_archives or 0 }}</div>
+                <div class="stat-label">Archivés</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="last-modified">
+                    {% if summary.dernier_modifie %}
+                        {{ summary.dernier_modifie.date_modification.strftime('%d/%m') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+                <div class="stat-label">Dernier Modif</div>
+            </div>
+        </div>
+
+        <!-- Barre d'actions principales -->
+        <div class="main-actions">
+            {% if current_user.role_level >= 2 %}
+            <button onclick="showCreateProjectModal()" class="btn btn-primary">
+                ➕ Nouveau Projet
+            </button>
+            
+            <button onclick="showImportModal()" class="btn btn-info">
+                📂 Importer Projet
+            </button>
+            
+            <button onclick="showTemplatesModal()" class="btn btn-success">
+                📋 Modèles
+            </button>
+            {% endif %}
+            
+            <button onclick="refreshProjects()" class="btn btn-secondary" id="refresh-btn">
+                🔄 Actualiser
+            </button>
+        </div>
+
+        <!-- Filtres et recherche -->
+        <div class="filters-bar">
+            <input type="text" id="search-projects" placeholder="🔍 Rechercher un projet..." onkeyup="filterProjects()">
+            
+            <select id="filter-status" onchange="filterProjects()">
+                <option value="">Tous les statuts</option>
+                <option value="active">Actifs seulement</option>
+                <option value="archived">Archivés seulement</option>
+            </select>
+            
+            <select id="sort-by" onchange="sortProjects()">
+                <option value="date_modification">Modifié récemment</option>
+                <option value="date_creation">Date de création</option>
+                <option value="nom_projet">Nom alphabétique</option>
+            </select>
+            
+            <button onclick="clearFilters()" class="btn btn-secondary btn-small">
+                🗑️ Effacer filtres
+            </button>
+        </div>
+
+        <!-- Liste des projets -->
+        <div class="projects-grid" id="projects-grid">
+            {% for project in projects %}
+            <div class="project-card {% if not project.actif_projet %}archived{% endif %}" 
+                 data-project-id="{{ project.id_projet }}"
+                 data-project-name="{{ project.nom_projet.lower() }}"
+                 data-project-status="{% if project.actif_projet %}active{% else %}archived{% endif %}">
+                
+                <!-- En-tête carte -->
+                <div class="project-header">
+                    <h3 class="project-title">{{ project.nom_projet }}</h3>
+                    <div class="project-badges">
+                        <span class="version-badge">v{{ project.version_projet }}</span>
+                        {% if not project.actif_projet %}
+                        <span class="status-badge archived">Archivé</span>
+                        {% endif %}
+                        {% if current_project and current_project.id_projet == project.id_projet %}
+                        <span class="status-badge current">Actuel</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Statistiques du projet -->
+                <div class="project-stats">
+                    <div class="stat-mini">
+                        <span class="stat-value">{{ project.stats.tags_total }}</span>
+                        <span class="stat-name">Tags</span>
+                    </div>
+                    <div class="stat-mini">
+                        <span class="stat-value">{{ project.stats.pages_total }}</span>
+                        <span class="stat-name">Pages</span>
+                    </div>
+                    <div class="stat-mini">
+                        <span class="stat-value">{{ project.stats.animations_total }}</span>
+                        <span class="stat-name">Objets</span>
+                    </div>
+                </div>
+
+                <!-- Informations du projet -->
+                <div class="project-info">
+                    <p class="project-creator">👤 {{ project.createur.nom }}</p>
+                    <p class="project-date">📅 {{ project.date_modification.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+
+                <!-- Actions sur le projet -->
+                <div class="project-actions">
+                    <button onclick="selectProject({{ project.id_projet }})" 
+                            class="btn btn-primary btn-small" 
+                            title="Sélectionner ce projet">
+                        📂 Ouvrir
+                    </button>
+                    
+                    {% if current_user.role_level >= 2 %}
+                    <div class="dropdown">
+                        <button class="btn btn-secondary btn-small dropdown-toggle" 
+                                onclick="toggleDropdown({{ project.id_projet }})">
+                            ⚙️ Actions
+                        </button>
+                        <div class="dropdown-menu" id="dropdown-{{ project.id_projet }}">
+                            <a href="#" onclick="showEditModal({{ project.id_projet }})">✏️ Modifier</a>
+                            <a href="#" onclick="duplicateProject({{ project.id_projet }})">📄 Dupliquer</a>
+                            <a href="#" onclick="exportProject({{ project.id_projet }})">💾 Exporter</a>
+                            <a href="#" onclick="showStatsModal({{ project.id_projet }})">📊 Statistiques</a>
+                            <div class="dropdown-divider"></div>
+                            {% if project.actif_projet %}
+                            <a href="#" onclick="archiveProject({{ project.id_projet }}, true)">📦 Archiver</a>
+                            {% else %}
+                            <a href="#" onclick="archiveProject({{ project.id_projet }}, false)">📤 Désarchiver</a>
+                            {% endif %}
+                            <a href="#" onclick="deleteProject({{ project.id_projet }})" class="danger">🗑️ Supprimer</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Message si aucun projet -->
+            {% if not projects %}
+            <div class="no-projects">
+                <div class="no-projects-icon">📁</div>
+                <h3>Aucun projet créé</h3>
+                <p>Créez votre premier projet pour commencer à développer votre interface IHM.</p>
+                {% if current_user.role_level >= 2 %}
+                <button onclick="showCreateProjectModal()" class="btn btn-primary">
+                    ➕ Créer le premier projet
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Pagination (si nécessaire) -->
+        <div class="pagination" id="pagination" style="display: none;">
+            <!-- Pagination générée dynamiquement -->
+        </div>
+    </div>
+
+    <!-- Modal : Créer un projet -->
+    <div id="modal-create-project" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>➕ Créer un Nouveau Projet</h2>
+                <span class="close" onclick="closeModal('modal-create-project')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="form-create-project">
+                    <div class="form-group">
+                        <label for="new-project-name">📝 Nom du projet *</label>
+                        <input type="text" id="new-project-name" placeholder="Mon Projet IHM" required>
+                        <div class="validation-message" id="name-validation"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new-project-version">🏷️ Version</label>
+                        <input type="text" id="new-project-version" value="1.0" placeholder="1.0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📋 Modèle de départ</label>
+                        <select id="new-project-template">
+                            <option value="">Projet vide</option>
+                            <option value="basic_hmi">IHM Basique</option>
+                            <option value="siemens_s7">Siemens S7 Standard</option>
+                            <option value="demo_project">Projet de Démonstration</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-project')">
+                    Annuler
+                </button>
+                <button type="button" class="btn btn-primary" onclick="createProject()">
+                    ➕ Créer le projet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal : Importer un projet -->
+    <div id="modal-import-project" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📂 Importer un Projet</h2>
+                <span class="close" onclick="closeModal('modal-import-project')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="import-file">📄 Fichier de projet (.json)</label>
+                    <input type="file" id="import-file" accept=".json" onchange="validateImportFile()">
+                </div>
+                
+                <div class="form-group">
+                    <label for="import-new-name">📝 Nouveau nom (optionnel)</label>
+                    <input type="text" id="import-new-name" placeholder="Laissez vide pour garder le nom original">
+                </div>
+                
+                <div class="import-preview" id="import-preview" style="display: none;">
+                    <h4>Aperçu du projet à importer :</h4>
+                    <div id="import-details"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-import-project')">
+                    Annuler
+                </button>
+                <button type="button" class="btn btn-primary" onclick="importProject()" id="btn-import" disabled>
+                    📂 Importer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal : Statistiques projet -->
+    <div id="modal-project-stats" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📊 Statistiques du Projet</h2>
+                <span class="close" onclick="closeModal('modal-project-stats')">&times;</span>
+            </div>
+            <div class="modal-body" id="stats-content">
+                <!-- Contenu généré dynamiquement -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-project-stats')">
+                    Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts JavaScript -->
+    <script>
+        // Variables globales
+        let allProjects = {{ projects | tojson | safe }};
+        let currentProject = {{ current_project | tojson | safe if current_project else 'null' }};
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Gestion des projets - Prête');
+            console.log(`Projets chargés: ${allProjects.length}`);
+            
+            // Validation en temps réel du nom de projet
+            document.getElementById('new-project-name').addEventListener('input', validateProjectName);
+        });
+
+        // Gestion des projets
+        function selectProject(projectId) {
+            showSpinner('Sélection du projet...');
+            
+            fetch(`/api/projects/${projectId}/set_current`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Erreur sélection projet: ' + error.message, 'error');
+            })
+            .finally(() => {
+                hideSpinner();
+            });
+        }
+
+        async function createProject() {
+            const name = document.getElementById('new-project-name').value.trim();
+            const version = document.getElementById('new-project-version').value.trim() || '1.0';
+            const template = document.getElementById('new-project-template').value;
+
+            if (!name) {
+                showMessage('Nom de projet requis', 'error');
+                return;
+            }
+
+            showSpinner('Création du projet...');
+
+            try {
+                const response = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        nom_projet: name,
+                        version_projet: version,
+                        template: template
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    closeModal('modal-create-project');
+                    document.getElementById('form-create-project').reset();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Erreur création: ' + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        async function deleteProject(projectId) {
+            const project = allProjects.find(p => p.id_projet === projectId);
+            if (!project) return;
+
+            const confirmMessage = `⚠️ ATTENTION !\n\nSupprimer définitivement le projet "${project.nom_projet}" ?\n\nCela supprimera :\n• ${project.stats.tags_total} tags\n• ${project.stats.pages_total} pages\n• ${project.stats.animations_total} objets graphiques\n\nCette action est IRRÉVERSIBLE !`;
+
+            if (!confirm(confirmMessage)) return;
+
+            showSpinner('Suppression du projet...');
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Erreur suppression: ' + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        async function duplicateProject(projectId) {
+            const project = allProjects.find(p => p.id_projet === projectId);
+            if (!project) return;
+
+            const newName = prompt(`Nom pour la copie de "${project.nom_projet}" :`, `${project.nom_projet} (copie)`);
+            if (!newName) return;
+
+            showSpinner('Duplication du projet...');
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}/duplicate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        new_name: newName
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Erreur duplication: ' + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        async function exportProject(projectId) {
+            const project = allProjects.find(p => p.id_projet === projectId);
+            if (!project) return;
+
+            showSpinner('Préparation de l\'export...');
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}/export`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Télécharger le fichier
+                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { 
+                        type: 'application/json' 
+                    });
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Erreur export: ' + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        async function archiveProject(projectId, archive) {
+            const project = allProjects.find(p => p.id_projet === projectId);
+            if (!project) return;
+
+            const action = archive ? 'archiver' : 'désarchiver';
+            if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} le projet "${project.nom_projet}" ?`)) return;
+
+            showSpinner(`${action.charAt(0).toUpperCase() + action.slice(1)} du projet...`);
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}/archive`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ archive: archive })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage(`Erreur ${action}: ` + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        // Fonctions utilitaires
+        function showCreateProjectModal() {
+            document.getElementById('modal-create-project').style.display = 'block';
+        }
+
+        function showImportModal() {
+            document.getElementById('modal-import-project').style.display = 'block';
+        }
+
+        function showTemplatesModal() {
+            alert('Modèles de projets - Fonctionnalité à implémenter');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function clearCurrentProject() {
+            if (confirm('Désélectionner le projet actuel ?')) {
+                fetch('/api/projects/debug/reset_session', {
+                    method: 'POST'
+                })
+                .then(() => location.reload());
+            }
+        }
+
+        function refreshProjects() {
+            location.reload();
+        }
+
+        function filterProjects() {
+            const search = document.getElementById('search-projects').value.toLowerCase();
+            const status = document.getElementById('filter-status').value;
+            const cards = document.querySelectorAll('.project-card');
+
+            cards.forEach(card => {
+                const name = card.dataset.projectName;
+                const cardStatus = card.dataset.projectStatus;
+
+                const matchName = name.includes(search);
+                const matchStatus = !status || cardStatus === status;
+
+                card.style.display = matchName && matchStatus ? 'block' : 'none';
+            });
+        }
+
+        function clearFilters() {
+            document.getElementById('search-projects').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('sort-by').value = 'date_modification';
+            filterProjects();
+        }
+
+        function sortProjects() {
+            // Implémentation du tri à faire
+            console.log('Tri des projets - À implémenter');
+        }
+
+        function toggleDropdown(projectId) {
+            const dropdown = document.getElementById(`dropdown-${projectId}`);
+            // Fermer tous les autres dropdowns
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu.id !== `dropdown-${projectId}`) {
+                    menu.style.display = 'none';
+                }
+            });
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function showEditModal(projectId) {
+            const project = allProjects.find(p => p.id_projet === projectId);
+            if (!project) return;
+
+            const newName = prompt(`Modifier le nom du projet :`, project.nom_projet);
+            if (!newName || newName === project.nom_projet) return;
+
+            updateProject(projectId, { nom_projet: newName });
+        }
+
+        async function updateProject(projectId, data) {
+            showSpinner('Modification du projet...');
+
+            try {
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage(result.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Erreur modification: ' + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        function showStatsModal(projectId) {
+            alert('Statistiques détaillées - Fonctionnalité à implémenter');
+        }
+
+        function showMessage(message, type = 'info') {
+            // Créer un message flash temporaire
+            const flashDiv = document.createElement('div');
+            flashDiv.className = `flash-message flash-${type}`;
+            flashDiv.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(flashDiv, container.firstChild);
+            
+            setTimeout(() => {
+                if (flashDiv.parentNode) {
+                    flashDiv.parentNode.removeChild(flashDiv);
+                }
+            }, 5000);
+        }
+
+        function showSpinner(message = 'Chargement...') {
+            // Créer ou mettre à jour le spinner
+            let spinner = document.getElementById('loading-spinner');
+            if (!spinner) {
+                spinner = document.createElement('div');
+                spinner.id = 'loading-spinner';
+                spinner.className = 'loading-spinner';
+                spinner.innerHTML = `
+                    <div class="spinner-backdrop"></div>
+                    <div class="spinner-content">
+                        <div class="spinner-icon">🔄</div>
+                        <div class="spinner-message">${message}</div>
+                    </div>
+                `;
+                document.body.appendChild(spinner);
+            } else {
+                spinner.querySelector('.spinner-message').textContent = message;
+                spinner.style.display = 'block';
+            }
+        }
+
+        function hideSpinner() {
+            const spinner = document.getElementById('loading-spinner');
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
+        }
+
+        // Validation nom projet
+        async function validateProjectName() {
+            const name = document.getElementById('new-project-name').value.trim();
+            const validation = document.getElementById('name-validation');
+
+            if (name.length < 3) {
+                validation.textContent = 'Le nom doit faire au moins 3 caractères';
+                validation.className = 'validation-message error';
+                return false;
+            }
+
+            try {
+                const response = await fetch('/api/projects/validate_name', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ nom_projet: name })
+                });
+
+                const data = await response.json();
+
+                if (data.available) {
+                    validation.textContent = '✅ Nom disponible';
+                    validation.className = 'validation-message success';
+                    return true;
+                } else {
+                    validation.textContent = '❌ Ce nom est déjà utilisé';
+                    validation.className = 'validation-message error';
+                    return false;
+                }
+            } catch (error) {
+                validation.textContent = 'Erreur validation';
+                validation.className = 'validation-message error';
+                return false;
+            }
+        }
+
+        // Import de projet
+        function validateImportFile() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+            const btnImport = document.getElementById('btn-import');
+            const preview = document.getElementById('import-preview');
+            const details = document.getElementById('import-details');
+
+            if (!file) {
+                btnImport.disabled = true;
+                preview.style.display = 'none';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const projectData = JSON.parse(e.target.result);
+                    
+                    if (projectData.project && projectData.project.nom_projet) {
+                        details.innerHTML = `
+                            <p><strong>Nom:</strong> ${projectData.project.nom_projet}</p>
+                            <p><strong>Version:</strong> ${projectData.project.version_projet || 'N/A'}</p>
+                            <p><strong>Tags:</strong> ${projectData.tags ? projectData.tags.length : 0}</p>
+                            <p><strong>Pages:</strong> ${projectData.pages ? projectData.pages.length : 0}</p>
+                            <p><strong>Animations:</strong> ${projectData.animations ? projectData.animations.length : 0}</p>
+                        `;
+                        preview.style.display = 'block';
+                        btnImport.disabled = false;
+                    } else {
+                        throw new Error('Format de fichier invalide');
+                    }
+                } catch (error) {
+                    details.innerHTML = `<p style="color: red;">❌ ${error.message}</p>`;
+                    preview.style.display = 'block';
+                    btnImport.disabled = true;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function importProject() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+            const newName = document.getElementById('import-new-name').value.trim();
+
+            if (!file) return;
+
+            showSpinner('Import du projet...');
+
+            try {
+                const fileContent = await file.text();
+                const projectData = JSON.parse(fileContent);
+
+                const response = await fetch('/api/projects/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        project_data: projectData,
+                        new_name: newName || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    closeModal('modal-import-project');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage(data.error, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Erreur import: ' + error.message, 'error');
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        // Fermer les dropdowns en cliquant ailleurs
+        document.addEventListener('click', function(event) {
+            if (!event.target.matches('.dropdown-toggle')) {
+                const dropdowns = document.querySelectorAll('.dropdown-menu');
+                dropdowns.forEach(dropdown => {
+                    dropdown.style.display = 'none';
+                });
+            }
+        });
+
+        // Fermer les modales en cliquant en dehors
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+
+        // Gestion des touches clavier
+        document.addEventListener('keydown', function(event) {
+            // Échap pour fermer les modales
+            if (event.key === 'Escape') {
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
+    </script>
+
+    <!-- Styles pour le spinner -->
+    <style>
+        .loading-spinner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            display: block;
+        }
+
+        .spinner-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(3px);
+        }
+
+        .spinner-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .spinner-icon {
+            font-size: 2rem;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        .spinner-message {
+            color: #333;
+            font-weight: 600;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>
