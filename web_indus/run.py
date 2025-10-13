@@ -8,7 +8,7 @@ sys.path.insert(0, str(root_dir))
 
 from app import create_app, db
 
-# Création de l'application Flask
+# Création de l'application Flask.
 app = create_app(os.getenv('FLASK_ENV', 'development'))
 
 @app.shell_context_processor
