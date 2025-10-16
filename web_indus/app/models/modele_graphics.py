@@ -1237,6 +1237,226 @@ class HMIProject(db.Model):
 # COULEUR DYNAMIQUE
 # =================================================================
 class ColorRule(db.Model):
+    """Règle de couleur dynamique - VERSION FINALE"""
+    
+    # ✅ Nom EXACT de ta BDD
+    __tablename__ = 'color_rule'
+    
+    # ✅ Structure EXACTE selon ta BDD
+    id_color_rule = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nom_regle = db.Column(db.String(100), nullable=False)
+    
+    # ✅ ForeignKey EXACTE vers hmi_project (minuscules dans ta BDD)
+    id_projet = db.Column(db.Integer, db.ForeignKey('hmi_project.id_projet'), nullable=False)
+    
+    object_id = db.Column(db.Integer, nullable=False)
+    tag_name = db.Column(db.String(100), nullable=False)
+    operator = db.Column(db.String(10), nullable=False)  # ✅ varchar(10) dans ta BDD
+    target_value = db.Column(db.String(50), nullable=False)
+    color = db.Column(db.String(7), nullable=False)
+    priorite = db.Column(db.Integer, default=1)
+    actif = db.Column(db.Boolean, default=True)
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_modification = db.Column(db.DateTime, default=None, onupdate=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        """Initialisation"""
+        self.nom_regle = kwargs.get('nom_regle')
+        self.id_projet = kwargs.get('id_projet')
+        self.object_id = kwargs.get('object_id')
+        self.tag_name = kwargs.get('tag_name')
+        self.operator = kwargs.get('operator', '=')
+        self.target_value = str(kwargs.get('target_value', ''))
+        self.color = kwargs.get('color', '#ff0000')
+        self.priorite = kwargs.get('priorite', 1)
+        self.actif = kwargs.get('actif', True)
+        self.date_creation = datetime.utcnow()
+        self.date_modification = None
+
+    def to_dict(self):
+        """Conversion en dictionnaire"""
+        return {
+            "id": self.id_color_rule,
+            "id_color_rule": self.id_color_rule,
+            "nom_regle": self.nom_regle,
+            "id_projet": self.id_projet,
+            "object_id": self.object_id,
+            "tag_name": self.tag_name,
+            "operator": self.operator,
+            "target_value": self.target_value,
+            "color": self.color,
+            "priorite": self.priorite,
+            "actif": self.actif,
+            "date_creation": self.date_creation.strftime("%Y-%m-%d %H:%M:%S") if self.date_creation else None,
+            "date_modification": self.date_modification.strftime("%Y-%m-%d %H:%M:%S") if self.date_modification else None
+        }
+
+    def test_condition(self, tag_value):
+        """Teste si la condition est remplie - AVEC LOGS"""
+        if not self.actif:
+            print(f"⏸️ Règle '{self.nom_regle}' désactivée")
+            return False
+        
+        try:
+            # Conversion des valeurs
+            rule_value = self._convert_value(self.target_value)
+            test_value = self._convert_value(tag_value)
+            
+            print(f"🔍 TEST Règle '{self.nom_regle}':")
+            print(f"   Tag value: {tag_value} ({type(tag_value).__name__}) → converti: {test_value} ({type(test_value).__name__})")
+            print(f"   Rule value: {self.target_value} ({type(self.target_value).__name__}) → converti: {rule_value} ({type(rule_value).__name__})")
+            print(f"   Opérateur: '{self.operator}'")
+            
+            # Application de l'opérateur
+            operators_map = {
+                '=': lambda x, y: x == y,
+                '==': lambda x, y: x == y,
+                '!=': lambda x, y: x != y,
+                '>': lambda x, y: x > y,
+                '<': lambda x, y: x < y,
+                '>=': lambda x, y: x >= y,
+                '<=': lambda x, y: x <= y
+            }
+            
+            if self.operator in operators_map:
+                result = operators_map[self.operator](test_value, rule_value)
+                symbol = "✅" if result else "❌"
+                print(f"{symbol} Résultat: {test_value} {self.operator} {rule_value} = {result}")
+                
+                if result:
+                    print(f"🎨 COULEUR APPLIQUÉE: {self.color}")
+                
+                return result
+            else:
+                print(f"❌ Opérateur invalide: '{self.operator}'")
+                return False
+                
+        except Exception as e:
+            print(f"❌ ERREUR test condition règle '{self.nom_regle}': {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _convert_value(self, value):
+        """Convertit intelligemment une valeur"""
+        if value is None:
+            return None
+        
+        # Si c'est déjà un type natif, le retourner
+        if isinstance(value, (bool, int, float)):
+            return value
+        
+        # Convertir en string
+        str_value = str(value).strip()
+        
+        if not str_value:
+            return None
+        
+        str_value_lower = str_value.lower()
+        
+        # Booléens
+        if str_value_lower in ['true', '1', 'on', 'yes', 'oui']:
+            return True
+        elif str_value_lower in ['false', '0', 'off', 'no', 'non']:
+            return False
+        
+        # Nombres
+        try:
+            if '.' not in str_value and 'e' not in str_value_lower:
+                return int(str_value)
+            else:
+                return float(str_value)
+        except (ValueError, TypeError):
+            return str(value)
+
+    @classmethod
+    def get_rules_for_object(cls, object_id, project_id=None):
+        """Récupère toutes les règles actives pour un objet"""
+        print(f"📋 Recherche règles pour objet {object_id}, projet {project_id}")
+        
+        query = cls.query.filter_by(object_id=object_id, actif=True)
+        
+        if project_id:
+            query = query.filter_by(id_projet=project_id)
+        
+        rules = query.order_by(cls.priorite.asc(), cls.date_creation.asc()).all()
+        
+        print(f"   ➡️ {len(rules)} règle(s) trouvée(s)")
+        for rule in rules:
+            print(f"      - {rule.nom_regle} (priorité {rule.priorite}): {rule.tag_name} {rule.operator} {rule.target_value} → {rule.color}")
+        
+        return rules
+
+    @classmethod
+    def apply_rules_to_object(cls, animation, tag_value, project_id=None):
+        """Applique les règles à un objet et retourne la couleur finale"""
+        print(f"\n🎨 === APPLICATION RÈGLES POUR {animation.nom_animation} (ID: {animation.id_animation}) ===")
+        print(f"   Tag lié: {animation.tag_lie}")
+        print(f"   Valeur actuelle: {tag_value}")
+        print(f"   Couleur normale: {animation.couleur_normale}")
+        print(f"   Projet: {project_id}")
+        
+        # Récupérer les règles
+        rules = cls.get_rules_for_object(animation.id_animation, project_id)
+        
+        if not rules:
+            print(f"   ℹ️ Aucune règle définie → couleur normale")
+            return animation.couleur_normale
+        
+        # Vérifier chaque règle par ordre de priorité
+        for rule in rules:
+            print(f"\n   🔍 Test règle '{rule.nom_regle}' (priorité {rule.priorite}):")
+            
+            # Vérifier que le tag correspond
+            tag_match = rule.tag_name.strip() == animation.tag_lie.strip()
+            print(f"      Tag règle: '{rule.tag_name}' vs Tag animation: '{animation.tag_lie}' → Match: {tag_match}")
+            
+            if not tag_match:
+                print(f"      ⏭️ Tag ne correspond pas, règle ignorée")
+                continue
+            
+            # Tester la condition
+            if rule.test_condition(tag_value):
+                print(f"   ✅ RÈGLE APPLIQUÉE: {rule.nom_regle} → couleur {rule.color}")
+                return rule.color
+            else:
+                print(f"      ❌ Condition non remplie")
+        
+        # Aucune règle ne s'applique
+        print(f"   ℹ️ Aucune règle ne s'applique → couleur normale {animation.couleur_normale}")
+        return animation.couleur_normale
+
+
+# =================================================================
+# FONCTION BATCH
+# =================================================================
+def apply_color_rules_batch(animations_with_values, project_id=None):
+    """Applique les règles de couleur à un lot d'animations"""
+    print(f"\n🎨 ========== APPLICATION RÈGLES EN LOT (Projet {project_id}) ==========")
+    print(f"📊 Nombre d'animations à traiter: {len(animations_with_values)}")
+    
+    result = {}
+    
+    for animation, tag_value in animations_with_values:
+        try:
+            final_color = ColorRule.apply_rules_to_object(animation, tag_value, project_id)
+            result[animation.id_animation] = final_color
+            
+            if final_color != animation.couleur_normale:
+                print(f"\n🎨 COULEUR CHANGÉE: {animation.nom_animation}")
+                print(f"   {animation.couleur_normale} → {final_color}")
+                print(f"   Valeur: {tag_value}")
+            
+        except Exception as e:
+            print(f"\n❌ ERREUR application règle pour {animation.nom_animation}: {e}")
+            import traceback
+            traceback.print_exc()
+            result[animation.id_animation] = animation.couleur_normale
+    
+    print(f"\n✅ Application règles terminée: {len(result)} objets traités")
+    print(f"🎨 ============================================================\n")
+    
+    return result
     """Règle de couleur dynamique simplifiée"""
     
     __tablename__ = 'color_rule'

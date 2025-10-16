@@ -433,6 +433,20 @@
                     </select>
                 </div>
 
+                <!-- NOUVEAU : Affichage ID objet pour debug -->
+                <div class="property-group" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>🔍 ID Objet:</strong>
+                            <span id="debug-object-id" style="font-family: monospace; font-size: 1.1em; font-weight: bold; margin-left: 8px;">-</span>
+                        </div>
+                        <div>
+                            <strong>ID Animation:</strong>
+                            <span id="debug-animation-id" style="font-family: monospace; font-size: 1.1em; font-weight: bold; margin-left: 8px;">-</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Position et taille -->
                 <h3>📐 Position & Taille</h3>
                 
@@ -674,7 +688,7 @@
         ];
 
         // Utilitaires pour couleurs
-        function hexToRgb(hex) {
+        function hexToRgb (hex) {
             const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
             return result ? {
                 r: parseInt(result[1], 16),
@@ -1833,7 +1847,11 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    objects = result.animations;
+                    // CORRECTION : Normaliser l'identifiant
+                    objects = result.animations.map(obj => ({
+                        ...obj,
+                        id: obj.id_animation || obj.id  // Créer un alias 'id' pointant vers 'id_animation'
+                    }));
                     
                     const canvas = document.getElementById('design-canvas');
                     if (canvas) {
