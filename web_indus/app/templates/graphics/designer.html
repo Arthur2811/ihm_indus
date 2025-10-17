@@ -433,20 +433,6 @@
                     </select>
                 </div>
 
-                <!-- NOUVEAU : Affichage ID objet pour debug -->
-                <div class="property-group" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>🔍 ID Objet:</strong>
-                            <span id="debug-object-id" style="font-family: monospace; font-size: 1.1em; font-weight: bold; margin-left: 8px;">-</span>
-                        </div>
-                        <div>
-                            <strong>ID Animation:</strong>
-                            <span id="debug-animation-id" style="font-family: monospace; font-size: 1.1em; font-weight: bold; margin-left: 8px;">-</span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Position et taille -->
                 <h3>📐 Position & Taille</h3>
                 
@@ -477,21 +463,20 @@
                     </small>
                 </div>
 
-                <!-- NOUVEAU : Panel règles de couleur -->
+                <!-- Panel règles de COULEUR -->
                 <div class="color-rules-panel" id="color-rules-panel">
                     <h4>🎨 Règles de Couleur Dynamique</h4>
                     
-                    <!-- Formulaire création règle -->
                     <div class="rule-form">
                         <h5>➕ Nouvelle Règle</h5>
                         
                         <div class="form-row">
-                            <label>Nom de la règle:</label>
-                            <input type="text" id="rule-name" placeholder="Ex: LED rouge si température > 50">
+                            <label>Nom de la règle :</label>
+                            <input type="text" id="rule-name" placeholder="Ex : Rouge si température > 80">
                         </div>
 
                         <div class="form-row">
-                            <label>Tag à surveiller:</label>
+                            <label>Tag à surveiller :</label>
                             <select id="rule-tag">
                                 <option value="">-- Sélectionner --</option>
                                 {% for tag in tags_disponibles %}
@@ -501,7 +486,7 @@
                         </div>
 
                         <div class="form-row">
-                            <label>Condition:</label>
+                            <label>Condition :</label>
                             <div class="condition-group">
                                 <select id="rule-operator">
                                     <option value="=">=== (égal)</option>
@@ -509,14 +494,14 @@
                                     <option value=">">> (supérieur)</option>
                                     <option value="<">< (inférieur)</option>
                                     <option value=">=">>= (supérieur ou égal)</option>
-                                    <option value="<=">>= (inférieur ou égal)</option>
+                                    <option value="<="><= (inférieur ou égal)</option>
                                 </select>
                                 <input type="text" id="rule-value" placeholder="Valeur" style="flex: 1; margin-left: 5px;">
                             </div>
                         </div>
-
+                        
                         <div class="form-row">
-                            <label>Couleur à appliquer:</label>
+                            <label>Couleur à appliquer :</label>
                             <div class="color-row">
                                 <input type="color" id="rule-color" value="#ff0000">
                                 <div class="color-preview" id="color-preview">Aperçu</div>
@@ -524,8 +509,9 @@
                         </div>
 
                         <div class="form-row">
-                            <label>Priorité (1 = plus haute):</label>
-                            <input type="number" id="rule-priority" min="1" max="99" value="1">
+                            <label>Priorité :</label>
+                            <input type="number" id="rule-priority" value="1" min="1" max="100" style="width: 80px;">
+                            <small style="color: rgba(255,255,255,0.7); display: block; margin-top: 5px;">Plus le nombre est élevé, plus la règle est prioritaire</small>
                         </div>
 
                         <div class="form-actions">
@@ -538,7 +524,6 @@
                         </div>
                     </div>
 
-                    <!-- Liste des règles existantes -->
                     <div class="rules-list">
                         <div class="rules-header">
                             <h5>📋 Règles Existantes (<span id="rules-count">0</span>)</h5>
@@ -553,10 +538,87 @@
                         </div>
                         
                         <div id="rules-container">
-                            <div class="no-rules">Aucune règle définie</div>
+                            <div class="no-rules">Aucune règle de couleur définie</div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Panel règles de visiblité -->
+                <div class="visibility-rules-panel" id="visibility-rules-panel" style="display: none;">
+                    <h4>👁️ Règles de Visibilité Dynamique</h4>
+                    
+                    <!-- Formulaire création règle de Visibilité -->
+                    <div class="rule-form">
+                        <h5>➕ Nouvelle Règle</h5>
+                        
+                        <div class="form-row">
+                            <label>Nom de la règle :</label>
+                            <input type="text" id="vis-rule-name" placeholder="Ex : Masquer voyant si valeur = 0">
+                        </div>
+
+                        <div class="form-row">
+                            <label>Tag à surveiller :</label>
+                            <select id="vis-rule-tag">
+                                <option value="">-- Sélectionner --</option>
+                                {% for tag in tags_disponibles %}
+                                <option value="{{ tag.nom_tag }}">{{ tag.nom_tag }} ({{ tag.adresse_tag }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <label>Condition :</label>
+                            <div class="condition-group">
+                                <select id="vis-rule-operator">
+                                    <option value="=">=== (égal)</option>
+                                    <option value="!=">!== (différent)</option>
+                                    <option value=">">> (supérieur)</option>
+                                    <option value="<">< (inférieur)</option>
+                                    <option value=">=">>= (supérieur ou égal)</option>
+                                    <option value="<="><= (inférieur ou égal)</option>
+                                </select>
+                                <input type="text" id="vis-rule-value" placeholder="Valeur" style="flex: 1; margin-left: 5px;">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <label>Action de visibilité :</label>
+                            <select id="vis-rule-action">
+                                <option value="show">Afficher l'élément</option>
+                                <option value="hide">Masquer l'élément</option>
+                            </select>
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="btn btn-success btn-small" onclick="createVisibilityRule()">
+                                💾 Créer
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="clearVisibilityRuleForm()">
+                                🗑️ Effacer
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Liste des règles existantes de Visibilité -->
+                    <div class="rules-list">
+                        <div class="rules-header">
+                            <h5>📋 Règles Existantes (<span id="vis-rules-count">0</span>)</h5>
+                            <div class="rules-actions">
+                                <button class="btn btn-small btn-outline" onclick="loadVisibilityRules()" title="Actualiser">
+                                    🔄
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="deleteAllVisibilityRules()" title="Tout supprimer">
+                                    🗑️ Tout
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="vis-rules-container">
+                            <div class="no-rules">Aucune règle de visibilité définie</div>
+                        </div>
+                    </div>
+                </div>
+
 
                 <!-- Texte -->
                 <div class="property-group" id="text-properties">
@@ -679,6 +741,7 @@
         let availableIcons = [];
         let iconsByCategory = {};
         let currentObjectColorRules = []; // NOUVEAU : pour les règles de couleur
+        
 
         // Variables pour les règles de couleur
         let tags_disponibles = [
@@ -719,7 +782,7 @@
         });
 
         // NOUVEAU : Initialisation des règles de couleur
-        function initializeColorRules() {
+        function initializeColorRules () {
             const colorInput = document.getElementById('rule-color');
             const colorPreview = document.getElementById('color-preview');
             
@@ -1239,7 +1302,7 @@
             const propertiesPanel = document.getElementById('object-properties');
             propertiesPanel.style.display = 'block';
             
-            // Remplir les champs
+            // Remplir les champs de base
             document.getElementById('prop-name').value = selectedObject.nom || '';
             document.getElementById('prop-type').value = selectedObject.type || '';
             document.getElementById('prop-x').value = selectedObject.x || 0;
@@ -1247,7 +1310,6 @@
             document.getElementById('prop-width').value = selectedObject.width || 100;
             document.getElementById('prop-height').value = selectedObject.height || 60;
             document.getElementById('prop-color-normal').value = selectedObject.couleur_normale || '#CCCCCC';
-            // SUPPRIMÉ : document.getElementById('prop-color-active').value = selectedObject.couleur_active || '#28a745';
             document.getElementById('prop-text').value = selectedObject.texte || '';
             
             const tagValue = selectedObject.tag_lie || '';
@@ -1270,15 +1332,22 @@
             document.getElementById('prop-navigation-page').value = navigationPage;
             updateNavigationPageInfo(navigationPage);
             
+            // IMPORTANT : Appeler CETTE fonction pour afficher les panels
             updatePropertyGroupsVisibility();
             
+            // Propriétés icônes
             if (selectedObject.type === 'icon') {
                 updateIconProperties();
             }
             
-            // NOUVEAU : Charger les règles de couleur
+            // Charger les règles de COULEUR
             updateColorRulesPanel();
             loadObjectRules();
+            
+            // Charger les règles de VISIBILITÉ
+            loadVisibilityRules();
+            
+            console.log('✅ Propriétés mises à jour pour objet:', selectedObject.id, 'type:', selectedObject.type);
         }
 
         function hidePropertiesPanel() {
@@ -1330,10 +1399,32 @@
             const action = document.getElementById('prop-action').value;
             const navigationEnabled = document.getElementById('navigation-enabled').checked;
             
+            // Affichage des groupes de base
             document.getElementById('text-properties').style.display = ['text', 'button'].includes(type) ? 'block' : 'none';
             document.getElementById('write-value-group').style.display = action === 'write' ? 'block' : 'none';
             document.getElementById('navigation-page-group').style.display = navigationEnabled ? 'block' : 'none';
             document.getElementById('icon-properties').style.display = type === 'icon' ? 'block' : 'none';
+            
+            // NOUVEAU : Afficher le panel des règles de COULEUR
+            const colorPanel = document.getElementById('color-rules-panel');
+            if (colorPanel && selectedObject) {
+                // Afficher pour tous les objets visuels
+                const supportedTypes = ['rectangle', 'circle', 'button', 'led', 'text', 'icon'];
+                if (supportedTypes.includes(type)) {
+                    colorPanel.style.display = 'block';
+                    console.log('🎨 Panel couleur affiché pour type:', type);
+                } else {
+                    colorPanel.style.display = 'none';
+                }
+            }
+            
+            // NOUVEAU : Afficher le panel des règles de VISIBILITÉ
+            const visibilityPanel = document.getElementById('visibility-rules-panel');
+            if (visibilityPanel && selectedObject) {
+                // Afficher pour TOUS les objets (on peut masquer n'importe quoi)
+                visibilityPanel.style.display = 'block';
+                console.log('👁️ Panel visibilité affiché pour type:', type);
+            }
         }
 
         function updateIconProperties() {
@@ -2265,6 +2356,295 @@
                     }
                 }, 300);
             });
+        }
+
+        // =================================================================
+        // GESTION DES RÈGLES DE VISIBILITÉ (IDs corrigés - préfixe "vis-")
+        // =================================================================
+
+        async function loadVisibilityRules() {
+            if (!selectedObject) {
+                const container = document.getElementById('vis-rules-container');
+                if (container) {
+                    container.innerHTML = '<div class="no-rules">Sélectionner un objet</div>';
+                }
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/visibility-rules/${selectedObject.id}/object`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayVisibilityRules(result.rules);
+                } else {
+                    console.error('Erreur chargement règles:', result.error);
+                }
+            } catch (error) {
+                console.error('❌ Erreur chargement règles visibilité:', error);
+            }
+        }
+
+        function displayVisibilityRules(rules) {
+            const container = document.getElementById('vis-rules-container');
+            const countSpan = document.getElementById('vis-rules-count');
+            
+            if (!container || !countSpan) {
+                console.warn('Éléments DOM visibilité non trouvés');
+                return;
+            }
+            
+            countSpan.textContent = rules.length;
+            
+            if (rules.length === 0) {
+                container.innerHTML = '<div class="no-rules">Aucune règle de visibilité définie</div>';
+                return;
+            }
+            
+            container.innerHTML = rules.map(rule => `
+                <div class="rule-item ${rule.actif ? '' : 'inactive'}">
+                    <div class="rule-header-item">
+                        <div class="rule-name">${rule.nom_regle}</div>
+                        <div class="rule-status">${rule.actif ? '✅ Actif' : '❌ Inactif'}</div>
+                    </div>
+                    
+                    <div class="rule-details">
+                        <span class="rule-condition">${rule.tag_name} ${rule.operator} ${rule.target_value}</span>
+                        <span class="rule-action ${rule.action === 'hide' ? 'action-hide' : 'action-show'}">
+                            ${rule.action === 'hide' ? '🚫 Masquer' : '👁️ Afficher'}
+                        </span>
+                    </div>
+                    
+                    <div class="rule-actions">
+                        <button class="btn btn-small btn-danger" onclick="deleteVisibilityRule(${rule.id})" title="Supprimer">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createVisibilityRule() {
+            if (!selectedObject) {
+                showErrorMessage('Aucun objet sélectionné');
+                return;
+            }
+            
+            // CORRECTION: Utiliser les IDs avec préfixe "vis-"
+            const ruleName = document.getElementById('vis-rule-name').value.trim();
+            const tagName = document.getElementById('vis-rule-tag').value;
+            const operator = document.getElementById('vis-rule-operator').value;
+            const targetValue = document.getElementById('vis-rule-value').value.trim();
+            const action = document.getElementById('vis-rule-action').value;
+            
+            // Validations
+            if (!ruleName) {
+                showErrorMessage('Le nom de la règle est requis');
+                return;
+            }
+            
+            if (!tagName) {
+                showErrorMessage('Veuillez sélectionner un tag');
+                return;
+            }
+            
+            if (!targetValue) {
+                showErrorMessage('La valeur cible est requise');
+                return;
+            }
+            
+            const ruleData = {
+                nom_regle: ruleName,
+                object_id: selectedObject.id,
+                tag_name: tagName,
+                operator: operator,
+                target_value: targetValue,
+                action: action
+            };
+            
+            try {
+                const response = await fetch('/api/visibility-rules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ruleData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showSuccessMessage('✅ Règle de visibilité créée avec succès');
+                    clearVisibilityRuleForm();
+                    loadVisibilityRules();
+                } else {
+                    showErrorMessage('Erreur création: ' + (result.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                console.error('Erreur réseau:', error);
+                showErrorMessage('Erreur réseau: ' + error.message);
+            }
+        }
+
+        async function deleteVisibilityRule(ruleId) {
+            if (!confirm('Voulez-vous vraiment supprimer cette règle de visibilité ?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/visibility-rules/${ruleId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showSuccessMessage('✅ Règle de visibilité supprimée');
+                    loadVisibilityRules();
+                } else {
+                    const result = await response.json();
+                    showErrorMessage('Erreur suppression: ' + (result.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                showErrorMessage('Erreur: ' + error.message);
+            }
+        }
+
+        async function deleteAllVisibilityRules() {
+            if (!selectedObject) {
+                showErrorMessage('Aucun objet sélectionné');
+                return;
+            }
+            
+            const container = document.getElementById('vis-rules-container');
+            if (!container) return;
+            
+            // Compter les règles actuelles
+            const currentRules = container.querySelectorAll('.rule-item').length;
+            
+            if (currentRules === 0) {
+                showMessage('Aucune règle à supprimer', 'info');
+                return;
+            }
+            
+            if (!confirm(`Voulez-vous vraiment supprimer TOUTES les ${currentRules} règle(s) de visibilité de cet objet ?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/visibility-rules/all', {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showSuccessMessage('✅ Toutes les règles de visibilité supprimées');
+                    loadVisibilityRules();
+                } else {
+                    const result = await response.json();
+                    showErrorMessage('Erreur: ' + (result.error || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                showErrorMessage('Erreur: ' + error.message);
+            }
+        }
+
+        function clearVisibilityRuleForm() {
+            // CORRECTION: Utiliser les IDs avec préfixe "vis-"
+            const nameInput = document.getElementById('vis-rule-name');
+            const tagSelect = document.getElementById('vis-rule-tag');
+            const operatorSelect = document.getElementById('vis-rule-operator');
+            const valueInput = document.getElementById('vis-rule-value');
+            const actionSelect = document.getElementById('vis-rule-action');
+            
+            if (nameInput) nameInput.value = '';
+            if (tagSelect) tagSelect.selectedIndex = 0;
+            if (operatorSelect) operatorSelect.selectedIndex = 0;
+            if (valueInput) valueInput.value = '';
+            if (actionSelect) actionSelect.selectedIndex = 0;
+            
+            console.log('✅ Formulaire visibilité effacé');
+        }
+
+        // =================================================================
+        // MODIFICATION DE updatePropertiesPanel() EXISTANTE
+        // =================================================================
+
+        // TROUVE ta fonction updatePropertiesPanel() existante et REMPLACE-LA par celle-ci :
+        function updatePropertiesPanel() {
+            if (!selectedObject) return;
+            
+            document.getElementById('no-selection').style.display = 'none';
+            const propertiesPanel = document.getElementById('object-properties');
+            propertiesPanel.style.display = 'block';
+            
+            // Remplir les champs de base
+            document.getElementById('prop-name').value = selectedObject.nom || '';
+            document.getElementById('prop-type').value = selectedObject.type || '';
+            document.getElementById('prop-x').value = selectedObject.x || 0;
+            document.getElementById('prop-y').value = selectedObject.y || 0;
+            document.getElementById('prop-width').value = selectedObject.width || 100;
+            document.getElementById('prop-height').value = selectedObject.height || 60;
+            document.getElementById('prop-color-normal').value = selectedObject.couleur_normale || '#CCCCCC';
+            document.getElementById('prop-text').value = selectedObject.texte || '';
+            
+            const tagValue = selectedObject.tag_lie || '';
+            const actionValue = selectedObject.action_clic || 'read';
+            
+            document.getElementById('prop-tag').value = tagValue;
+            document.getElementById('prop-action').value = actionValue;
+            document.getElementById('prop-write-value').value = selectedObject.valeur_ecriture || '';
+            
+            // Navigation
+            let navigationEnabled = false;
+            let navigationPage = '';
+            
+            if (selectedObject.action_clic === 'navigate' || selectedObject.page_destination) {
+                navigationEnabled = true;
+                navigationPage = selectedObject.page_destination || '';
+            }
+            
+            document.getElementById('navigation-enabled').checked = navigationEnabled;
+            document.getElementById('prop-navigation-page').value = navigationPage;
+            updateNavigationPageInfo(navigationPage);
+            
+            updatePropertyGroupsVisibility();
+            
+            // Propriétés icônes
+            if (selectedObject.type === 'icon') {
+                updateIconProperties();
+            }
+            
+            // NOUVEAU : Charger les règles de COULEUR
+            updateColorRulesPanel();
+            loadObjectRules();
+            
+            // NOUVEAU : Charger les règles de VISIBILITÉ
+            const visibilityPanel = document.getElementById('visibility-rules-panel');
+            if (visibilityPanel) {
+                visibilityPanel.style.display = 'block';
+                loadVisibilityRules();
+                console.log('📊 Panel visibilité affiché pour objet:', selectedObject.id);
+            }
+        }
+
+        // =================================================================
+        // MODIFICATION DE hidePropertiesPanel() EXISTANTE
+        // =================================================================
+
+        // TROUVE ta fonction hidePropertiesPanel() existante et REMPLACE-LA par celle-ci :
+        function hidePropertiesPanel() {
+            document.getElementById('no-selection').style.display = 'block';
+            document.getElementById('object-properties').style.display = 'none';
+            
+            const iconProps = document.getElementById('icon-properties');
+            if (iconProps) iconProps.style.display = 'none';
+            
+            const colorPanel = document.getElementById('color-rules-panel');
+            if (colorPanel) colorPanel.style.display = 'none';
+            
+            // NOUVEAU : Masquer aussi le panel de visibilité
+            const visibilityPanel = document.getElementById('visibility-rules-panel');
+            if (visibilityPanel) visibilityPanel.style.display = 'none';
+            
+            console.log('❌ Panels masqués (aucun objet sélectionné)');
         }
 
         function injectNavigationStyles() {

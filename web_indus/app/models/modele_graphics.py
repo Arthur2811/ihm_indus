@@ -1620,4 +1620,142 @@ def apply_color_rules_batch(animations_with_values, project_id=None):
     
     return result
 
+# =================================================================
+# RÈGLES DE VISIBILITÉ DYNAMIQUE
+# =================================================================
+
+class VisibilityRule(db.Model):
+    """Règle de visibilité dynamique - Masquer/Afficher des objets"""
+    
+    __tablename__ = 'visibility_rule'
+    
+    id_visibility_rule = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nom_regle = db.Column(db.String(100), nullable=False)
+    id_projet = db.Column(db.Integer, db.ForeignKey('hmi_project.id_projet'), nullable=False)
+    object_id = db.Column(db.Integer, nullable=False)  # ID de l'animation
+    tag_name = db.Column(db.String(100), nullable=False)
+    operator = db.Column(db.String(10), nullable=False)  # '=', '!=', '>', '<', '>=', '<='
+    target_value = db.Column(db.String(50), nullable=False)
+    action = db.Column(db.String(10), nullable=False)  # 'show' ou 'hide'
+    priorite = db.Column(db.Integer, default=1)
+    actif = db.Column(db.Boolean, default=True)
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_modification = db.Column(db.DateTime, default=None, onupdate=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        self.nom_regle = kwargs.get('nom_regle')
+        self.id_projet = kwargs.get('id_projet')
+        self.object_id = kwargs.get('object_id')
+        self.tag_name = kwargs.get('tag_name')
+        self.operator = kwargs.get('operator', '=')
+        self.target_value = str(kwargs.get('target_value', ''))
+        self.action = kwargs.get('action', 'hide')
+        self.priorite = kwargs.get('priorite', 1)
+        self.actif = kwargs.get('actif', True)
+        self.date_creation = datetime.utcnow()
+
+    def to_dict(self):
+        return {
+            "id": self.id_visibility_rule,
+            "nom_regle": self.nom_regle,
+            "id_projet": self.id_projet,
+            "object_id": self.object_id,
+            "tag_name": self.tag_name,
+            "operator": self.operator,
+            "target_value": self.target_value,
+            "action": self.action,
+            "priorite": self.priorite,
+            "actif": self.actif,
+            "date_creation": self.date_creation.strftime("%Y-%m-%d %H:%M:%S") if self.date_creation else None
+        }
+
+    def test_condition(self, tag_value):
+        """Teste si la condition est remplie"""
+        if not self.actif:
+            return False
+        
+        try:
+            rule_value = self._convert_value(self.target_value)
+            test_value = self._convert_value(tag_value)
+            
+            operators_map = {
+                '=': lambda x, y: x == y,
+                '==': lambda x, y: x == y,
+                '!=': lambda x, y: x != y,
+                '>': lambda x, y: x > y,
+                '<': lambda x, y: x < y,
+                '>=': lambda x, y: x >= y,
+                '<=': lambda x, y: x <= y
+            }
+            
+            if self.operator in operators_map:
+                result = operators_map[self.operator](test_value, rule_value)
+                print(f"👁️ Test visibilité '{self.nom_regle}': {test_value} {self.operator} {rule_value} = {result}")
+                return result
+            
+            return False
+                
+        except Exception as e:
+            print(f"❌ Erreur test condition visibilité: {e}")
+            return False
+
+    def _convert_value(self, value):
+        """Convertit intelligemment une valeur"""
+        if value is None:
+            return None
+        
+        if isinstance(value, (bool, int, float)):
+            return value
+        
+        str_value = str(value).strip().lower()
+        
+        if not str_value:
+            return None
+        
+        # Booléens
+        if str_value in ['true', '1', 'on', 'yes', 'oui']:
+            return True
+        elif str_value in ['false', '0', 'off', 'no', 'non']:
+            return False
+        
+        # Nombres
+        try:
+            if '.' not in str_value:
+                return int(str_value)
+            else:
+                return float(str_value)
+        except (ValueError, TypeError):
+            return str(value)
+
+    @classmethod
+    def get_rules_for_object(cls, object_id, project_id=None):
+        """Récupère toutes les règles actives pour un objet"""
+        query = cls.query.filter_by(object_id=object_id, actif=True)
+        
+        if project_id:
+            query = query.filter_by(id_projet=project_id)
+            
+        return query.order_by(cls.priorite.asc()).all()
+
+    @classmethod
+    def apply_rules_to_object(cls, animation, tag_value, project_id=None):
+        """
+        Applique les règles à un objet et retourne l'action à effectuer
+        Retourne: 'show', 'hide', ou None (pas de changement)
+        """
+        rules = cls.get_rules_for_object(animation.id_animation, project_id)
+        
+        if not rules:
+            return None  # Pas de règles = pas de changement
+        
+        # Vérifier chaque règle par ordre de priorité
+        for rule in rules:
+            if rule.tag_name.strip() != animation.tag_lie.strip():
+                continue
+                
+            if rule.test_condition(tag_value):
+                print(f"✅ Règle visibilité appliquée: {rule.nom_regle} → {rule.action}")
+                return rule.action
+        
+        return None  # Aucune règle ne s'applique
 

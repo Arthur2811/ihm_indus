@@ -2218,3 +2218,186 @@ def api_validate_all_rules():
             'success': False,
             'error': str(e)
         }), 500
+    
+# =================================================================
+# API VISIBILITY RULES - GESTION DES RÈGLES DE VISIBILITÉ
+# =================================================================
+
+@main_bp.route('/api/visibility-rules', methods=['GET'])
+@AuthSystem.login_required
+def api_get_visibility_rules():
+    """Récupère toutes les règles de visibilité actives du projet"""
+    current_project_id = session.get('current_project_id')
+    
+    if not current_project_id:
+        return jsonify({
+            'success': False,
+            'error': 'Aucun projet sélectionné'
+        }), 400
+    
+    try:
+        from app.models.modele_graphics import VisibilityRule
+        
+        rules = VisibilityRule.query.filter_by(
+            id_projet=current_project_id,
+            actif=True
+        ).order_by(VisibilityRule.priorite.asc()).all()
+        
+        return jsonify([rule.to_dict() for rule in rules]), 200
+        
+    except Exception as e:
+        print(f"❌ Erreur récupération règles visibilité: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/api/visibility-rules', methods=['POST'])
+@AuthSystem.login_required
+def api_create_visibility_rule():
+    """Crée une nouvelle règle de visibilité"""
+    current_project_id = session.get('current_project_id')
+    
+    if not current_project_id:
+        return jsonify({
+            'success': False,
+            'error': 'Aucun projet sélectionné'
+        }), 400
+    
+    try:
+        data = request.json
+        
+        # Validation
+        required_fields = ['nom_regle', 'object_id', 'tag_name', 'target_value', 'action']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Champ manquant: {field}'
+                }), 400
+        
+        # Validation des valeurs
+        valid_operators = ['=', '!=', '>', '<', '>=', '<=']
+        if data.get('operator', '=') not in valid_operators:
+            return jsonify({
+                'success': False,
+                'error': 'Opérateur invalide'
+            }), 400
+        
+        valid_actions = ['show', 'hide']
+        if data['action'] not in valid_actions:
+            return jsonify({
+                'success': False,
+                'error': 'Action invalide (show/hide uniquement)'
+            }), 400
+        
+        from app.models.modele_graphics import VisibilityRule
+        
+        rule = VisibilityRule(
+            nom_regle=data['nom_regle'],
+            id_projet=current_project_id,
+            object_id=data['object_id'],
+            tag_name=data['tag_name'],
+            operator=data.get('operator', '='),
+            target_value=str(data['target_value']),
+            action=data['action'],
+            priorite=data.get('priorite', 1),
+            actif=data.get('actif', True)
+        )
+        
+        db.session.add(rule)
+        db.session.commit()
+        
+        print(f"✅ Règle visibilité créée: {data['nom_regle']} (ID: {rule.id_visibility_rule})")
+        return jsonify({
+            'id': rule.id_visibility_rule,
+            'message': 'Règle créée avec succès'
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erreur création règle visibilité: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/api/visibility-rules/<int:rule_id>', methods=['DELETE'])
+@AuthSystem.login_required
+def api_delete_visibility_rule(rule_id):
+    """Supprime une règle de visibilité"""
+    try:
+        from app.models.modele_graphics import VisibilityRule
+        
+        rule = VisibilityRule.query.get(rule_id)
+        if not rule:
+            return jsonify({
+                'success': False,
+                'error': 'Règle non trouvée'
+            }), 404
+        
+        rule_name = rule.nom_regle
+        db.session.delete(rule)
+        db.session.commit()
+        
+        print(f"✅ Règle visibilité {rule_id} supprimée")
+        return jsonify({'message': f'Règle "{rule_name}" supprimée'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erreur suppression règle: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/api/visibility-rules/all', methods=['DELETE'])
+@AuthSystem.login_required
+def api_delete_all_visibility_rules():
+    """Supprime toutes les règles de visibilité du projet"""
+    current_project_id = session.get('current_project_id')
+    
+    if not current_project_id:
+        return jsonify({
+            'success': False,
+            'error': 'Aucun projet sélectionné'
+        }), 400
+    
+    try:
+        from app.models.modele_graphics import VisibilityRule
+        
+        deleted_count = VisibilityRule.query.filter_by(
+            id_projet=current_project_id
+        ).delete()
+        
+        db.session.commit()
+        
+        print(f"✅ {deleted_count} règles visibilité supprimées")
+        return jsonify({
+            'message': f'{deleted_count} règles supprimées',
+            'count': deleted_count
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erreur suppression règles: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/api/visibility-rules/<int:object_id>/object', methods=['GET'])
+@AuthSystem.login_required
+def api_get_visibility_rules_for_object(object_id):
+    """Récupère les règles de visibilité pour un objet spécifique"""
+    current_project_id = session.get('current_project_id')
+    
+    try:
+        from app.models.modele_graphics import VisibilityRule
+        
+        rules = VisibilityRule.get_rules_for_object(object_id, current_project_id)
+        
+        return jsonify({
+            'success': True,
+            'rules': [rule.to_dict() for rule in rules],
+            'object_id': object_id,
+            'total': len(rules)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
